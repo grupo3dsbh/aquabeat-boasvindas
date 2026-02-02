@@ -288,7 +288,7 @@ $em_andamento = $stmt_andamento->fetchAll();
                             $dias_desde_venda = diasDesdeVenda($bv['data_venda']);
                             $urgente = $bv['status'] === 'pendente' && $dias_desde_venda > 1;
                         ?>
-                        <a href="titulo/<?= htmlspecialchars($bv['numero_titulo']) ?>" class="venda-card <?= $urgente ? 'urgente' : ($bv['status'] === 'em_andamento' ? 'em-andamento' : 'pendente') ?>">
+                        <a href="titulo?id=<?= htmlspecialchars($bv['numero_titulo']) ?>" class="venda-card <?= $urgente ? 'urgente' : ($bv['status'] === 'em_andamento' ? 'em-andamento' : 'pendente') ?>">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <h6 class="mb-1"><?= htmlspecialchars($bv['nome_cliente']) ?></h6>
@@ -486,7 +486,7 @@ $em_andamento = $stmt_andamento->fetchAll();
             }
 
             lista.append(`
-                <a href="titulo/${escapeHtml(venda.numero_titulo)}" class="venda-card ${statusClass}">
+                <a href="titulo?id=${escapeHtml(venda.numero_titulo)}" class="venda-card ${statusClass}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <h6 class="mb-1">${escapeHtml(venda.nome_cliente)}</h6>
