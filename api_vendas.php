@@ -15,8 +15,8 @@ try {
     $db_api = Database::getConnectionAPI();
     $db_bv = Database::getConnectionBV();
 
-    // Verificar se a tabela titulos_analise existe
-    $stmt_check = $db_api->query("SHOW TABLES LIKE 'titulos_analise'");
+    // Verificar se a tabela titulos existe
+    $stmt_check = $db_api->query("SHOW TABLES LIKE 'titulos'");
     if ($stmt_check->rowCount() === 0) {
         // Listar tabelas disponíveis para debug
         $stmt_tables = $db_api->query("SHOW TABLES");
@@ -24,7 +24,7 @@ try {
 
         jsonResponse([
             'success' => false,
-            'error' => 'Tabela "titulos_analise" não encontrada no banco ' . API_DB_NAME . '. Tabelas disponíveis: ' . implode(', ', $tabelas),
+            'error' => 'Tabela "titulos" não encontrada no banco ' . API_DB_NAME . '. Tabelas disponíveis: ' . implode(', ', $tabelas),
             'tabelas_disponiveis' => $tabelas
         ], 404);
     }
@@ -34,7 +34,7 @@ try {
     $ultimo_dia_mes = date('Y-m-t 23:59:59');
 
     // Verificar quais colunas existem na tabela
-    $stmt_cols = $db_api->query("DESCRIBE titulos_analise");
+    $stmt_cols = $db_api->query("DESCRIBE titulos");
     $colunas = $stmt_cols->fetchAll(PDO::FETCH_COLUMN);
 
     // Mapeamento de colunas possíveis
@@ -79,7 +79,7 @@ try {
     $campo_data = $campos_encontrados['data_venda'] ?? null;
     $tem_usado_relatorios = in_array('usado_relatorios', $colunas);
 
-    $sql = "SELECT " . implode(', ', $select_parts) . " FROM titulos_analise";
+    $sql = "SELECT " . implode(', ', $select_parts) . " FROM titulos";
 
     // Adicionar filtros
     $where = [];
