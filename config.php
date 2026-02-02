@@ -127,6 +127,13 @@ class Auth {
     }
 
     /**
+     * Obter email do usuário logado
+     */
+    public static function getUserEmail() {
+        return $_SESSION['usuario_email'] ?? null;
+    }
+
+    /**
      * Fazer login
      */
     public static function login($email, $senha) {

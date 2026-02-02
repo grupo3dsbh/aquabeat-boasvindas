@@ -19,12 +19,26 @@ try {
         throw new Exception('Você não pode desativar seu próprio usuário');
     }
     
+    // Buscar nome do usuario antes de alterar
+    $stmt_nome = $db->prepare("SELECT nome FROM usuarios WHERE id = :id");
+    $stmt_nome->execute([':id' => $id]);
+    $usuario_info = $stmt_nome->fetch();
+    $nome_usuario = $usuario_info ? $usuario_info['nome'] : 'ID ' . $id;
+
     $stmt = $db->prepare("UPDATE usuarios SET ativo = :ativo WHERE id = :id");
     $stmt->execute([
         ':ativo' => $ativo,
         ':id' => $id
     ]);
-    
+
+    // Registrar log de atividade
+    Logger::log(
+        null,
+        $ativo ? 'usuario_ativado' : 'usuario_desativado',
+        ($ativo ? 'Ativou' : 'Desativou') . ' o usuário: ' . $nome_usuario,
+        ['usuario_id' => $id, 'ativo' => $ativo]
+    );
+
     jsonResponse([
         'success' => true,
         'message' => $ativo ? 'Usuário ativado com sucesso!' : 'Usuário desativado com sucesso!'

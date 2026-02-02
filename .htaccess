@@ -6,11 +6,22 @@
 # Ativar RewriteEngine
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /
-    
+    RewriteBase /boasvindas/
+
     # Redirecionar para HTTPS (descomente em produção)
     # RewriteCond %{HTTPS} off
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # URLs Amigaveis - Remover .php da URL
+    # Se o arquivo .php existir, redireciona URL sem .php
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^([^\.]+)$ $1.php [NC,L]
+
+    # Redirecionar .php para URL limpa (opcional - descomente se quiser forcar)
+    # RewriteCond %{THE_REQUEST} ^[A-Z]{3,}\s([^.]+)\.php [NC]
+    # RewriteRule ^ %1 [R=301,L]
 </IfModule>
 
 # ==========================================

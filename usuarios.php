@@ -59,7 +59,7 @@ $usuarios = $stmt->fetchAll();
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="index.php">
+            <a class="navbar-brand" href="index">
                 <i class="bi bi-hand-thumbs-up-fill"></i> Boas-Vindas Aquabeat
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -68,18 +68,23 @@ $usuarios = $stmt->fetchAll();
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="index.php">
+                        <a class="nav-link" href="index">
                             <i class="bi bi-house-fill"></i> Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="usuarios.php">
+                        <a class="nav-link active" href="usuarios">
                             <i class="bi bi-people-fill"></i> Usuários
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="relatorios.php">
+                        <a class="nav-link" href="relatorios">
                             <i class="bi bi-graph-up"></i> Relatórios
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="configuracoes">
+                            <i class="bi bi-gear-fill"></i> Configurações
                         </a>
                     </li>
                     <li class="nav-item dropdown">
@@ -87,7 +92,9 @@ $usuarios = $stmt->fetchAll();
                             <i class="bi bi-person-circle"></i> <?= htmlspecialchars(Auth::getUserName()) ?>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="logout.php"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+                            <li><a class="dropdown-item" href="perfil"><i class="bi bi-person"></i> Meu Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="logout"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
                         </ul>
                     </li>
                 </ul>
