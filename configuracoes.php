@@ -236,30 +236,81 @@ try {
                 <div class="content-section">
                     <h5 class="mb-4"><i class="bi bi-gear-fill"></i> Configurações do Sistema</h5>
 
+                    <?php
+                    // Labels amigáveis para as configurações
+                    $labels = [
+                        'empresa_nome' => 'Nome da Empresa',
+                        'empresa_email' => 'E-mail da Empresa',
+                        'empresa_telefone' => 'Telefone da Empresa',
+                        'empresa_whatsapp' => 'WhatsApp da Empresa',
+                        'filtro_data_padrao' => 'Período Padrão no Dashboard',
+                        'filtro_data_inicio' => 'Data Início (personalizado)',
+                        'filtro_data_fim' => 'Data Fim (personalizado)',
+                        'mostrar_selector_periodo' => 'Mostrar seletor de período no Dashboard',
+                        'portal_url' => 'URL do Portal do Cliente',
+                        'whatsapp_numero' => 'WhatsApp para Scripts',
+                        'telefone_atendimento' => 'Telefone para Scripts',
+                        'email_atendimento' => 'E-mail para Scripts'
+                    ];
+
+                    // Opções para filtro_data_padrao
+                    $opcoes_periodo = [
+                        'mes_atual' => 'Mês Atual',
+                        'mes_anterior' => 'Mês Anterior',
+                        'ultimos_30_dias' => 'Últimos 30 dias',
+                        'ultimos_60_dias' => 'Últimos 60 dias',
+                        'intervalo_personalizado' => 'Intervalo Personalizado'
+                    ];
+                    ?>
                     <form method="POST">
-                        <?php foreach ($configuracoes as $chave => $config): ?>
+                        <?php foreach ($configuracoes as $chave => $config):
+                            $valor = $config['valor'] ?? '';
+                            $label = $labels[$chave] ?? $config['descricao'];
+                        ?>
                         <div class="config-item">
                             <label for="config_<?= $chave ?>" class="form-label">
-                                <?= htmlspecialchars($config['descricao']) ?>
+                                <?= htmlspecialchars($label) ?>
                             </label>
 
-                            <?php if ($config['tipo'] === 'numero'): ?>
-                            <input type="number" class="form-control" id="config_<?= $chave ?>"
-                                   name="config_<?= $chave ?>" value="<?= htmlspecialchars($config['valor']) ?>">
-                            <?php elseif ($config['tipo'] === 'booleano'): ?>
+                            <?php if ($chave === 'filtro_data_padrao'): ?>
+                            <!-- Dropdown para período -->
                             <select class="form-select" id="config_<?= $chave ?>" name="config_<?= $chave ?>">
-                                <option value="1" <?= $config['valor'] == '1' ? 'selected' : '' ?>>Sim</option>
-                                <option value="0" <?= $config['valor'] == '0' ? 'selected' : '' ?>>Não</option>
+                                <?php foreach ($opcoes_periodo as $opt_val => $opt_label): ?>
+                                <option value="<?= $opt_val ?>" <?= $valor === $opt_val ? 'selected' : '' ?>><?= $opt_label ?></option>
+                                <?php endforeach; ?>
                             </select>
+
+                            <?php elseif ($chave === 'mostrar_selector_periodo' || $config['tipo'] === 'boolean' || $config['tipo'] === 'booleano'): ?>
+                            <!-- Toggle para boolean -->
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="config_<?= $chave ?>" name="config_<?= $chave ?>"
+                                       value="1" <?= $valor == '1' ? 'checked' : '' ?>>
+                                <label class="form-check-label" for="config_<?= $chave ?>">
+                                    <?= $valor == '1' ? 'Ativado' : 'Desativado' ?>
+                                </label>
+                            </div>
+
+                            <?php elseif (strpos($chave, 'data_') !== false && strpos($chave, 'filtro_') !== false): ?>
+                            <!-- Date picker para datas -->
+                            <input type="date" class="form-control" id="config_<?= $chave ?>"
+                                   name="config_<?= $chave ?>" value="<?= htmlspecialchars($valor) ?>">
+                            <small class="text-muted">Usado apenas quando período = "Intervalo Personalizado"</small>
+
+                            <?php elseif ($config['tipo'] === 'numero'): ?>
+                            <input type="number" class="form-control" id="config_<?= $chave ?>"
+                                   name="config_<?= $chave ?>" value="<?= htmlspecialchars($valor) ?>">
+
                             <?php elseif ($config['tipo'] === 'textarea'): ?>
                             <textarea class="form-control" id="config_<?= $chave ?>"
-                                      name="config_<?= $chave ?>" rows="3"><?= htmlspecialchars($config['valor']) ?></textarea>
+                                      name="config_<?= $chave ?>" rows="3"><?= htmlspecialchars($valor) ?></textarea>
+
                             <?php else: ?>
                             <input type="text" class="form-control" id="config_<?= $chave ?>"
-                                   name="config_<?= $chave ?>" value="<?= htmlspecialchars($config['valor']) ?>">
+                                   name="config_<?= $chave ?>" value="<?= htmlspecialchars($valor) ?>">
                             <?php endif; ?>
 
-                            <small>Chave: <code><?= $chave ?></code> | Última atualização: <?= formatarData($config['atualizado_em']) ?></small>
+                            <small class="text-muted">Atualizado: <?= formatarData($config['atualizado_em'] ?? '') ?></small>
                         </div>
                         <?php endforeach; ?>
 

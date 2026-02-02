@@ -256,10 +256,10 @@ $tentativas_stats = $stmt->fetchAll();
                             <td class="text-center">
                                 <span class="badge bg-warning"><?= $atendente['pendentes'] ?></span>
                             </td>
-                            <td class="text-center"><?= number_format($atendente['media_tentativas'], 1) ?></td>
+                            <td class="text-center"><?= number_format($atendente['media_tentativas'] ?? 0, 1) ?></td>
                             <td class="text-center">
                                 <?php if ($atendente['media_nota']): ?>
-                                    <span class="badge bg-primary"><?= number_format($atendente['media_nota'], 1) ?>/5</span>
+                                    <span class="badge bg-primary"><?= number_format($atendente['media_nota'] ?? 0, 1) ?>/5</span>
                                 <?php else: ?>
                                     -
                                 <?php endif; ?>
