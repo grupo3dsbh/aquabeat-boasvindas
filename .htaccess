@@ -12,6 +12,9 @@
     # RewriteCond %{HTTPS} off
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+    # URL amigavel para titulo/ID (ex: titulo/SFA-10115)
+    RewriteRule ^titulo/([^/]+)/?$ titulo.php?id=$1 [NC,L,QSA]
+
     # URLs Amigaveis - Remover .php da URL
     # Se o arquivo .php existir, redireciona URL sem .php
     RewriteCond %{REQUEST_FILENAME} !-d

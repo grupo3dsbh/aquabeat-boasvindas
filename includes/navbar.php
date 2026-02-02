@@ -13,19 +13,77 @@ if (!isset($pagina_atual)) {
     $pagina_atual = '';
 }
 
-// Buscar foto do usuário se existir
+// Buscar foto do usuário e notificações
 $foto_usuario = null;
+$notificacoes = [
+    'vendas_pendentes' => 0,  // Vendas com mais de 1 dia sem contato
+    'retornos' => 0,          // Clientes que não atenderam
+    'agendados' => 0          // Retornos agendados para hoje
+];
+
 try {
     $db_nav = Database::getConnectionBV();
+
+    // Foto do usuário
     $stmt_foto = $db_nav->prepare("SELECT foto FROM usuarios WHERE id = :id");
     $stmt_foto->execute([':id' => Auth::getUserId()]);
     $result_foto = $stmt_foto->fetch();
     if ($result_foto && !empty($result_foto['foto'])) {
         $foto_usuario = $result_foto['foto'];
     }
+
+    // Notificações - Vendas pendentes (mais de 1 dia)
+    $stmt_pendentes = $db_nav->prepare("
+        SELECT COUNT(*) as total FROM boas_vindas
+        WHERE status = 'pendente'
+        AND DATEDIFF(NOW(), data_venda) > 1
+        AND (usuario_id = :usuario_id OR :is_admin = 1)
+    ");
+    $stmt_pendentes->execute([
+        ':usuario_id' => Auth::getUserId(),
+        ':is_admin' => Auth::isAdmin() ? 1 : 0
+    ]);
+    $notificacoes['vendas_pendentes'] = $stmt_pendentes->fetch()['total'] ?? 0;
+
+    // Notificações - Clientes que não atenderam (precisa retornar)
+    $stmt_retornos = $db_nav->prepare("
+        SELECT COUNT(*) as total FROM boas_vindas
+        WHERE status IN ('pendente', 'em_andamento')
+        AND resultado_ultimo_contato = 'nao_atendeu'
+        AND (usuario_id = :usuario_id OR :is_admin = 1)
+    ");
+    try {
+        $stmt_retornos->execute([
+            ':usuario_id' => Auth::getUserId(),
+            ':is_admin' => Auth::isAdmin() ? 1 : 0
+        ]);
+        $notificacoes['retornos'] = $stmt_retornos->fetch()['total'] ?? 0;
+    } catch (Exception $e) {
+        // Coluna pode não existir ainda
+    }
+
+    // Notificações - Retornos agendados para hoje
+    $stmt_agendados = $db_nav->prepare("
+        SELECT COUNT(*) as total FROM boas_vindas
+        WHERE status IN ('pendente', 'em_andamento')
+        AND DATE(proxima_tentativa) = CURDATE()
+        AND (usuario_id = :usuario_id OR :is_admin = 1)
+    ");
+    try {
+        $stmt_agendados->execute([
+            ':usuario_id' => Auth::getUserId(),
+            ':is_admin' => Auth::isAdmin() ? 1 : 0
+        ]);
+        $notificacoes['agendados'] = $stmt_agendados->fetch()['total'] ?? 0;
+    } catch (Exception $e) {
+        // Coluna pode não existir ainda
+    }
+
 } catch (Exception $e) {
     // Silenciar erro
 }
+
+$total_notificacoes = $notificacoes['vendas_pendentes'] + $notificacoes['retornos'] + $notificacoes['agendados'];
 ?>
 <nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container-fluid">
@@ -59,6 +117,57 @@ try {
                     </a>
                 </li>
                 <?php endif; ?>
+                <!-- Notificações -->
+                <li class="nav-item dropdown">
+                    <a class="nav-link position-relative" href="#" role="button" data-bs-toggle="dropdown" title="Notificações">
+                        <i class="bi bi-bell-fill"></i>
+                        <?php if ($total_notificacoes > 0): ?>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 10px;">
+                            <?= $total_notificacoes > 99 ? '99+' : $total_notificacoes ?>
+                        </span>
+                        <?php endif; ?>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" style="min-width: 300px;">
+                        <li><h6 class="dropdown-header">Notificações</h6></li>
+                        <?php if ($total_notificacoes === 0): ?>
+                        <li><span class="dropdown-item-text text-muted">Nenhuma notificação</span></li>
+                        <?php else: ?>
+                            <?php if ($notificacoes['vendas_pendentes'] > 0): ?>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center" href="index?filtro=pendentes">
+                                    <span class="badge bg-warning me-2"><?= $notificacoes['vendas_pendentes'] ?></span>
+                                    <div>
+                                        <strong>Vendas Pendentes</strong>
+                                        <small class="d-block text-muted">Mais de 1 dia sem contato</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+                            <?php if ($notificacoes['retornos'] > 0): ?>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center" href="index?filtro=retornos">
+                                    <span class="badge bg-danger me-2"><?= $notificacoes['retornos'] ?></span>
+                                    <div>
+                                        <strong>Retornos Pendentes</strong>
+                                        <small class="d-block text-muted">Cliente não atendeu</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+                            <?php if ($notificacoes['agendados'] > 0): ?>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center" href="index?filtro=agendados">
+                                    <span class="badge bg-info me-2"><?= $notificacoes['agendados'] ?></span>
+                                    <div>
+                                        <strong>Agendados Hoje</strong>
+                                        <small class="d-block text-muted">Retornos programados</small>
+                                    </div>
+                                </a>
+                            </li>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </ul>
+                </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle <?= $pagina_atual === 'perfil' ? 'active' : '' ?>" href="#" role="button" data-bs-toggle="dropdown">
                         <?php if ($foto_usuario && file_exists(__DIR__ . '/../' . $foto_usuario)): ?>

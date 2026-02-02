@@ -29,9 +29,13 @@ try {
         ], 404);
     }
 
-    // Buscar vendas do mês atual
-    $primeiro_dia_mes = date('Y-m-01 00:00:00');
-    $ultimo_dia_mes = date('Y-m-t 23:59:59');
+    // Buscar vendas - aceitar filtro de data via GET
+    $data_inicio = $_GET['data_inicio'] ?? date('Y-m-01');
+    $data_fim = $_GET['data_fim'] ?? date('Y-m-t');
+
+    // Validar datas
+    $primeiro_dia_mes = date('Y-m-d 00:00:00', strtotime($data_inicio));
+    $ultimo_dia_mes = date('Y-m-d 23:59:59', strtotime($data_fim));
 
     // Verificar quais colunas existem na tabela
     $stmt_cols = $db_api->query("DESCRIBE titulos");
