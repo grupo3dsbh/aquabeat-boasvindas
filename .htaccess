@@ -13,6 +13,9 @@
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
     # URL amigavel para titulo/ID (ex: titulo/SFA-10115)
+    # Verifica que não é arquivo/diretório existente primeiro
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^titulo/([^/]+)/?$ titulo.php?id=$1 [NC,L,QSA]
 
     # URLs Amigaveis - Remover .php da URL
