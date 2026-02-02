@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setor de Boas-Vindas Aquabeat - Manual do Atendente</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            page-break-inside: avoid;
+        }
+
+        .section-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .icon {
+            font-size: 1.2em;
+        }
+
+        .checklist {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .checklist-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateX(5px);
+        }
+
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            margin-right: 15px;
+            flex-shrink: 0;
+            margin-top: 2px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .checkbox:hover {
+            background: #f0f0f0;
+        }
+
+        .checkbox.checked {
+            background: #667eea;
+            color: white;
+        }
+
+        .checklist-item.sub-item {
+            margin-left: 35px;
+            background: #f8f9fa;
+        }
+
+        .script-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .script-box strong {
+            color: #1565c0;
+            font-style: normal;
+        }
+
+        .alert-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .alert-box.danger {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .alert-box.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .alert-box.info {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+        }
+
+        .info-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .info-card h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .template-box {
+            background: #f1f3f4;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95em;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-card h4 {
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .metric-card ul {
+            list-style: none;
+            text-align: left;
+        }
+
+        .metric-card ul li {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .metric-card ul li:last-child {
+            border-bottom: none;
+        }
+
+        .print-button {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            display: block;
+            margin: 30px auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .print-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+
+            .print-button {
+                display: none;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+
+        .divider {
+            height: 2px;
+            background: linear-gradient(to right, transparent, #667eea, transparent);
+            margin: 30px 0;
+        }
+
+        .highlight {
+            background: #ffeb3b;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .badge.new {
+            background: #28a745;
+            color: white;
+        }
+
+        .badge.important {
+            background: #dc3545;
+            color: white;
+        }
+
+        .badge.optional {
+            background: #6c757d;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .section-title {
+                font-size: 1.2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Setor de Boas-Vindas Aquabeat</h1>
+            <p>Manual Completo do Atendente</p>
+        </div>
+
+        <div class="content">
+            <button class="print-button" onclick="window.print()">🖨️ Imprimir Manual</button>
+
+            <div class="alert-box success">
+                <strong>👋 Bem-vindo(a) ao time!</strong><br>
+                Este manual foi criado para te ajudar a realizar atendimentos de excelência. Siga o checklist e os scripts para garantir que todos os clientes tenham uma experiência incrível!
+            </div>
+
+            <!-- SEÇÃO: OBJETIVO -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">🎯</span>
+                    <span>Objetivo do Setor</span>
+                </div>
+                <div class="info-card">
+                    <p><strong>O Setor de Boas-Vindas tem como objetivo:</strong></p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>✅ Dar as boas-vindas ao novo cliente</li>
+                        <li>✅ Validar informações e confirmar dados</li>
+                        <li>✅ Esclarecer dúvidas sobre o título</li>
+                        <li>✅ Garantir que o cliente saiba usar o portal</li>
+                        <li>✅ Identificar problemas na jornada de compra</li>
+                        <li>✅ Avaliar qualidade do atendimento do consultor</li>
+                        <li>✅ Oferecer suporte e criar relacionamento</li>
+                    </ul>
+                </div>
+                <div class="alert-box info">
+                    <strong>⏰ Timing:</strong> A ligação deve ser feita <span class="highlight">1 dia após a compra (D+1)</span>
+                </div>
+            </div>
+
+            <!-- SEÇÃO: CHECKLIST COMPLETO -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">📋</span>
+                    <span>Checklist Completo da Ligação</span>
+                </div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">🔧 PREPARAÇÃO ANTES DA LIGAÇÃO</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Verificar dados do cliente no sistema (ID Cota, CPF, nome, telefone)</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Conferir dados do consultor que vendeu</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Verificar se pagamento da entrada foi confirmado</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Ter acesso ao portal para suporte em tempo real</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">👋 ABERTURA DA LIGAÇÃO</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Cumprimentar com energia e cordialidade</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Identificar-se: "Bom dia/tarde! Meu nome é [NOME], do setor de Boas-Vindas do Aquabeat"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Perguntar se pode falar alguns minutos</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Explicar o motivo: "Estou ligando para dar as boas-vindas e ajudar com qualquer dúvida sobre seu título"</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">🔒 VALIDAÇÃO DO TITULAR</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Solicitar confirmação: "Para sua segurança, preciso confirmar alguns dados"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Informar o ID da Cota e solicitar confirmação</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Solicitar os 4 últimos dígitos do CPF</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Aguardar confirmação positiva</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">💻 INFORMAÇÕES SOBRE O PORTAL</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Informar que o título pode ser gerenciado pelo portal</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Perguntar se já acessou o portal</div>
+                    </div>
+                    <div class="checklist-item sub-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div><strong>SE SIM:</strong> Perguntar se teve alguma dificuldade</div>
+                    </div>
+                    <div class="checklist-item sub-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div><strong>SE NÃO:</strong> Oferecer ajuda para primeiro acesso</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Verificar se precisa sincronizar dados</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Perguntar se consegue acessar normalmente</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Se necessário, oferecer reset de senha</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Instruir sobre cadastro de dependentes</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Informar o link do portal</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">⭐ VALIDAÇÃO DO ATENDIMENTO</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Confirmar nome do consultor que vendeu</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Perguntar: "O [NOME_CONSULTOR] deu um bom atendimento?"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Anotar feedback (positivo ou negativo)</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Se negativo, pedir detalhes para melhoria</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">💰 VALIDAÇÃO FINANCEIRA</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Perguntar: "Como foi para realizar o pagamento da entrada?"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Identificar se houve algum problema/dificuldade</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Perguntar: "O consultor informou sobre a anuidade?"</div>
+                    </div>
+                    <div class="checklist-item sub-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Confirmar valor da anuidade</div>
+                    </div>
+                    <div class="checklist-item sub-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Confirmar data de vencimento</div>
+                    </div>
+                    <div class="checklist-item sub-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Explicar forma de pagamento</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Se não foi informado, explicar detalhadamente</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">📢 INFORMAÇÕES IMPORTANTES</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Confirmar e-mail cadastrado</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Confirmar telefone/WhatsApp</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Confirmar endereço (para envios)</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Informar canais de atendimento disponíveis (WhatsApp, Telefone, E-mail, Portal)</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Informar prazo para primeira visita</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Explicar necessidade de agendamento</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Alertar sobre períodos de manutenção (se houver)</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Mencionar benefícios exclusivos do título</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Informar sobre programa de indicação (se houver)</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">❓ DÚVIDAS GERAIS</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Perguntar: "Tem alguma dúvida que eu possa esclarecer?"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Responder todas as dúvidas com clareza</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Anotar dúvidas que não conseguir responder para retorno</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">🎁 OFERTA DE SERVIÇOS</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Oferecer: "Gostaria de agendar sua primeira visita agora?"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Oferecer: "Posso te adicionar no grupo de WhatsApp com novidades?" (se houver)</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Oferecer: "Quer que eu envie por WhatsApp um resumo das informações?"</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">👋 ENCERRAMENTO</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Agradecer pela atenção</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Reforçar que estamos à disposição</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Desejar boas-vindas novamente</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Finalizar com cordialidade</div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">📝 REGISTRO PÓS-LIGAÇÃO (IMEDIATO)</h3>
+                    <div class="alert-box danger">
+                        <strong>⚠️ IMPORTANTE:</strong> Estes registros devem ser feitos IMEDIATAMENTE após a ligação!
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Registrar data/hora da ligação</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Registrar status: [ ] Atendido [ ] Não atendeu [ ] Retornar</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Registrar tempo de duração</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Anotar principais observações</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Registrar nível de satisfação: [ ] Muito satisfeito [ ] Satisfeito [ ] Neutro [ ] Insatisfeito</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Registrar problemas identificados</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Registrar ações necessárias (follow-up)</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Atualizar CRM com todas as informações</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO: SCRIPTS COMPLETOS -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">💬</span>
+                    <span>Scripts Completos</span>
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">1️⃣ ABERTURA</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "Bom dia/Boa tarde!<br><br>
+                    
+                    Meu nome é <span class="highlight">[NOME]</span>, estou ligando do setor de Boas-Vindas do Aquabeat. 
+                    Posso falar alguns minutos com você?<br><br>
+                    
+                    <em>[AGUARDAR RESPOSTA]</em><br><br>
+                    
+                    Que ótimo! Estou ligando para te dar as boas-vindas como novo titular e 
+                    ajudar com qualquer dúvida sobre seu título. Tudo bem para você agora?"
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">2️⃣ VALIDAÇÃO</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "Perfeito! Para sua segurança, preciso confirmar alguns dados rapidinho.<br><br>
+                    
+                    Seu ID de Cota é <span class="highlight">[NÚMERO]</span>, está correto?<br><br>
+                    
+                    <em>[AGUARDAR]</em><br><br>
+                    
+                    Ótimo! E pode me confirmar os 4 últimos dígitos do seu CPF?<br><br>
+                    
+                    <em>[AGUARDAR CONFIRMAÇÃO]</em><br><br>
+                    
+                    Perfeito, confirmado!"
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">3️⃣ PORTAL</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "<span class="highlight">[NOME]</span>, você já acessou o portal do titular?<br><br>
+                    
+                    <strong>[SE SIM]</strong><br>
+                    "Que ótimo! Conseguiu acessar sem problemas? Viu que lá você pode cadastrar 
+                    seus dependentes e gerenciar tudo relacionado ao seu título?"<br><br>
+                    
+                    <strong>[SE NÃO]</strong><br>
+                    "Sem problemas! O portal é bem simples. Lá você consegue gerenciar tudo do 
+                    seu título, cadastrar dependentes, fazer agendamentos... Quer que eu te ajude 
+                    a fazer o primeiro acesso agora?"<br><br>
+                    
+                    <strong>[SE TIVER PROBLEMA COM SENHA]</strong><br>
+                    "Tranquilo! Posso resetar sua senha agora mesmo e você recebe por e-mail/SMS. 
+                    Pode ser?"
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">4️⃣ VALIDAÇÃO DO CONSULTOR</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "<span class="highlight">[NOME]</span>, vi aqui que quem te atendeu foi o(a) <span class="highlight">[NOME_CONSULTOR]</span>. 
+                    Ele(a) deu um bom atendimento para você?"<br><br>
+                    
+                    <em>[AGUARDAR FEEDBACK]</em><br><br>
+                    
+                    <strong>[SE POSITIVO]</strong> "Que ótimo! Vou repassar esse feedback para ele(a)!"<br>
+                    <strong>[SE NEGATIVO]</strong> "Entendo... pode me contar o que aconteceu para melhorarmos?"
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">5️⃣ VALIDAÇÃO FINANCEIRA</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "E me conta, como foi para você fazer o pagamento da entrada? 
+                    Teve alguma dificuldade?"<br><br>
+                    
+                    <em>[AGUARDAR]</em><br><br>
+                    
+                    "E o consultor te informou sobre a anuidade do título?"<br><br>
+                    
+                    <strong>[SE SIM]</strong><br>
+                    "Perfeito! Só para confirmar: a anuidade é de R$ <span class="highlight">[VALOR]</span> e vence 
+                    todo dia <span class="highlight">[DIA]</span> de <span class="highlight">[MÊS]</span>, certo?"<br><br>
+                    
+                    <strong>[SE NÃO]</strong><br>
+                    "Deixa eu te explicar então: seu título tem uma anuidade de R$ <span class="highlight">[VALOR]</span> 
+                    que vence todo dia <span class="highlight">[DIA]</span> de <span class="highlight">[MÊS]</span>. Você vai receber boleto/cobrança 
+                    automaticamente. Tudo bem?"
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">6️⃣ INFORMAÇÕES GERAIS</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "Deixa eu te passar algumas informações importantes:<br><br>
+                    
+                    1. Você pode falar com a gente pelo WhatsApp <span class="highlight">[NÚMERO]</span>, telefone <span class="highlight">[NÚMERO]</span>, 
+                       e-mail <span class="highlight">[EMAIL]</span> ou pelo portal.<br><br>
+                    
+                    2. Seu e-mail cadastrado é <span class="highlight">[EMAIL]</span>, está correto? E o telefone <span class="highlight">[NÚMERO]</span>?<br><br>
+                    
+                    3. Para sua primeira visita, é importante agendar pelo portal ou WhatsApp. 
+                       O prazo para usar o título é <span class="highlight">[X dias/imediato]</span>.<br><br>
+                    
+                    4. Tem alguns benefícios exclusivos no seu título: <span class="highlight">[LISTAR BENEFÍCIOS]</span><br><br>
+                    
+                    5. <strong>[SE HOUVER]</strong> Temos um programa de indicação onde você ganha <span class="highlight">[BENEFÍCIO]</span> 
+                       a cada amigo que indicar. Quer saber mais?"
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">7️⃣ DÚVIDAS</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "<span class="highlight">[NOME]</span>, tem alguma dúvida que eu possa esclarecer para você?"<br><br>
+                    
+                    <em>[RESPONDER TODAS AS DÚVIDAS]</em>
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">8️⃣ OFERTAS</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "Já que estamos aqui, quer aproveitar e agendar sua primeira visita agora?"<br><br>
+                    
+                    <strong>[SE SIM]</strong> <em>[FAZER AGENDAMENTO]</em><br>
+                    <strong>[SE NÃO]</strong> "Sem problemas! Quando quiser é só acessar o portal ou chamar no WhatsApp!"<br><br>
+                    
+                    "Posso te adicionar no nosso grupo de WhatsApp onde a gente manda novidades e promoções?"<br><br>
+                    
+                    "Quer que eu te envie um resumo de tudo que conversamos por WhatsApp?"
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">9️⃣ ENCERRAMENTO</h3>
+                <div class="script-box">
+                    <strong>Atendente:</strong> "<span class="highlight">[NOME]</span>, foi um prazer te atender! Seja muito bem-vindo(a) à família Aquabeat! 🎉<br><br>
+                    
+                    Qualquer coisa que precisar, estamos à disposição, tá bom?<br><br>
+                    
+                    Aproveite muito seu título e até logo!"
+                </div>
+            </div>
+
+            <!-- SEÇÃO: ALTERAÇÃO DE VAGAS -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">🔄</span>
+                    <span>Alteração de Vagas</span>
+                </div>
+
+                <div class="alert-box info">
+                    <strong>📌 Quando usar:</strong> Quando o cliente solicitar alteração de vagas para visita
+                </div>
+
+                <div class="checklist">
+                    <h3 style="color: #667eea; margin-bottom: 15px;">QUANDO RECEBER SOLICITAÇÃO</h3>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Entrar em contato com o cliente</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Confirmar: "Vi aqui que você solicitou alteração de vagas, está correto?"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Informar: "A primeira alteração é gratuita"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Informar: "As próximas alterações terão custo de R$ [VALOR]"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Perguntar: "Confirma a alteração?"</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Processar no sistema</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Confirmar conclusão ao cliente</div>
+                    </div>
+                    <div class="checklist-item">
+                        <div class="checkbox" onclick="toggleCheck(this)"></div>
+                        <div>Enviar confirmação por e-mail/WhatsApp</div>
+                    </div>
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">📱 Template WhatsApp - Alteração de Vagas</h3>
+                <div class="template-box">
+Oi [NOME]! 👋
+
+Vi aqui que você solicitou alteração de vagas. Está correto?
+
+Lembrando que:
+✅ Primeira alteração: GRATUITA
+⚠️ Próximas alterações: R$ [VALOR]
+
+Confirma para eu processar?
+                </div>
+            </div>
+
+            <!-- SEÇÃO: FLUXO DE CONTINGÊNCIA -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">⚠️</span>
+                    <span>Fluxo de Contingência</span>
+                </div>
+
+                <div class="alert-box danger">
+                    <strong>🚨 ATENÇÃO:</strong> Siga este fluxo quando não conseguir contato com o cliente
+                </div>
+
+                <div class="info-card">
+                    <h4>📞 SE NÃO ATENDER (1ª tentativa)</h4>
+                    <div class="checklist">
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Registrar no sistema: "Tentativa 1 - Não atendeu"</div>
+                        </div>
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Aguardar 2 horas</div>
+                        </div>
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Tentar novamente em horário diferente</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h4>📞 SE NÃO ATENDER (2ª tentativa)</h4>
+                    <div class="checklist">
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Registrar no sistema: "Tentativa 2 - Não atendeu"</div>
+                        </div>
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Enviar WhatsApp (ver template abaixo)</div>
+                        </div>
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Aguardar 24h</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h4>💬 SE NÃO RESPONDER WHATSAPP</h4>
+                    <div class="checklist">
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Tentar 3ª ligação no dia seguinte</div>
+                        </div>
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Se não atender, enviar e-mail</div>
+                        </div>
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Marcar para nova tentativa em D+3</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h4>📞 SE CAIR NA CAIXA POSTAL</h4>
+                    <div class="checklist">
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>NÃO deixar mensagem</div>
+                        </div>
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Tentar novamente em outro horário</div>
+                        </div>
+                        <div class="checklist-item">
+                            <div class="checkbox" onclick="toggleCheck(this)"></div>
+                            <div>Seguir fluxo de contingência</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO: TEMPLATES WHATSAPP -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">📱</span>
+                    <span>Templates de WhatsApp</span>
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">1️⃣ Cliente não atendeu ligação</h3>
+                <div class="template-box">
+Olá [NOME]! 👋
+
+Aqui é [SEU_NOME] do setor de Boas-Vindas do Aquabeat! 
+
+Tentei ligar mas não consegui contato. Quando tiver um tempinho, 
+me chama aqui que quero te dar as boas-vindas e tirar qualquer 
+dúvida sobre seu título! 😊
+
+Estou por aqui!
+                </div>
+
+                <h3 style="color: #667eea; margin: 20px 0 15px 0;">2️⃣ Resumo pós-ligação</h3>
+                <div class="template-box">
+Oi [NOME]! 
+
+Obrigado pelo papo de hoje! 😊
+
+Resumindo o que conversamos:
+
+✅ Seu ID de Cota: [NÚMERO]
+✅ Portal: [LINK]
+✅ WhatsApp: [NÚMERO]
+✅ Telefone: [NÚMERO]
+✅ Anuidade: R$ [VALOR] - Vence dia [DIA]/[MÊS]
+✅ Prazo primeira visita: [PRAZO]
+
+Qualquer dúvida, estou por aqui!
+
+Bem-vindo(a) à família Aquabeat! 🎉
+                </div>
+            </div>
+
+            <!-- SEÇÃO: MÉTRICAS -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">📊</span>
+                    <span>Métricas para Acompanhar</span>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h4>📅 DIÁRIAS</h4>
+                        <ul>
+                            <li>Quantidade de ligações realizadas</li>
+                            <li>Taxa de atendimento (%)</li>
+                            <li>Ligações pendentes</li>
+                            <li>Tempo médio de ligação</li>
+                        </ul>
+                    </div>
+
+                    <div class="metric-card">
+                        <h4>📈 SEMANAIS</h4>
+                        <ul>
+                            <li>NPS médio do atendimento</li>
+                            <li>Principais problemas identificados</li>
+                            <li>Quantos resetaram senha</li>
+                            <li>Quantos não sabiam da anuidade</li>
+                            <li>Taxa de agendamento primeira visita</li>
+                            <li>Feedback sobre consultores</li>
+                        </ul>
+                    </div>
+
+                    <div class="metric-card">
+                        <h4>📆 MENSAIS</h4>
+                        <ul>
+                            <li>Evolução da satisfação</li>
+                            <li>Problemas recorrentes</li>
+                            <li>Sugestões de melhorias</li>
+                            <li>Taxa de conversão primeira visita</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEÇÃO: DICAS IMPORTANTES -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="icon">💡</span>
+                    <span>Dicas Importantes</span>
+                </div>
+
+                <div class="alert-box success">
+                    <h4 style="margin-bottom: 10px;">✅ FAÇA:</h4>
+                    <ul style="margin-left: 20px;">
+                        <li>Seja cordial e empático</li>
+                        <li>Demonstre interesse genuíno</li>
+                        <li>Fale de forma clara e pausada</li>
+                        <li>Anote TODAS as informações importantes</li>
+                        <li>Registre tudo imediatamente após a ligação</li>
+                        <li>Sorria ao falar (o cliente percebe!)</li>
+                        <li>Use o nome do cliente durante a conversa</li>
+                    </ul>
+                </div>
+
+                <div class="alert-box danger">
+                    <h4 style="margin-bottom: 10px;">❌ NÃO FAÇA:</h4>
+                    <ul style="margin-left: 20px;">
+                        <li>Não interrompa o cliente</li>
+                        <li>Não use termos técnicos complexos</li>
+                        <li>Não deixe dúvidas sem resposta</li>
+                        <li>Não esqueça de registrar informações</li>
+                        <li>Não apresse o cliente</li>
+                        <li>Não prometa o que não pode cumprir</li>
+                        <li>Não deixe mensagem na caixa postal</li>
+                    </ul>
+                </div>
+
+                <div class="alert-box info">
+                    <h4 style="margin-bottom: 10px;">🎯 LEMBRE-SE:</h4>
+                    <ul style="margin-left: 20px;">
+                        <li>Você é o primeiro contato pós-venda</li>
+                        <li>Sua ligação define a experiência do cliente</li>
+                        <li>Identifique e resolva problemas rapidamente</li>
+                        <li>Seja o elo entre cliente e empresa</li>
+                        <li>Cada ligação é uma oportunidade de encantar!</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- RODAPÉ -->
+            <div class="section">
+                <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px;">
+                    <h2 style="margin-bottom: 15px;">🎉 Seja bem-vindo(a) ao time! 🎉</h2>
+                    <p style="font-size: 1.1em;">Você é parte essencial da experiência Aquabeat!</p>
+                    <p style="margin-top: 10px; opacity: 0.9;">Em caso de dúvidas, procure seu supervisor ou gestor.</p>
+                </div>
+            </div>
+
+            <button class="print-button" onclick="window.print()">🖨️ Imprimir Manual</button>
+        </div>
+    </div>
+
+    <script>
+        function toggleCheck(element) {
+            element.classList.toggle('checked');
+            if (element.classList.contains('checked')) {
+                element.innerHTML = '✓';
+            } else {
+                element.innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>

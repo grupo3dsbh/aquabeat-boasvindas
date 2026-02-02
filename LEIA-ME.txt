@@ -1,0 +1,203 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║              🎉 SISTEMA DE BOAS-VINDAS AQUABEAT 🎉                          ║
+║                      INSTRUÇÕES DE INSTALAÇÃO                                ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📦 CONTEÚDO DO PACOTE
+══════════════════════════════════════════════════════════════════════════════
+
+✅ 16 arquivos PHP (sistema completo)
+✅ 1 arquivo SQL (estrutura do banco)
+✅ 2 arquivos de documentação (README.md e GUIA_INSTALACAO.html)
+✅ 1 manual imprimível (manual-boas-vindas-aquabeat.html)
+✅ 1 instalador automático (install.php)
+✅ 1 arquivo .htaccess (configurações Apache)
+
+
+🚀 INSTALAÇÃO RÁPIDA (3 PASSOS)
+══════════════════════════════════════════════════════════════════════════════
+
+PASSO 1: FAZER UPLOAD
+──────────────────────
+• Extraia o arquivo sistema-boasvindas-aquabeat-completo.zip
+• Faça upload de TODOS os arquivos para seu servidor
+• Mantenha todos os arquivos na mesma pasta
+
+
+PASSO 2: ACESSAR INSTALADOR
+────────────────────────────
+• Abra seu navegador
+• Acesse: http://seudominio.com.br/caminho/install.php
+• Ou em localhost: http://localhost/boasvindas/install.php
+
+
+PASSO 3: SEGUIR O ASSISTENTE
+─────────────────────────────
+• O instalador irá verificar os requisitos automaticamente
+• Preencha os dados do banco de dados
+• Crie o usuário administrador
+• Clique em "Finalizar"
+• Pronto! Sistema instalado!
+
+
+📋 REQUISITOS MÍNIMOS
+══════════════════════════════════════════════════════════════════════════════
+
+• PHP 7.4 ou superior
+• MySQL 5.7 ou superior (ou MariaDB 10.2+)
+• Apache 2.4+ (ou Nginx)
+• Extensões PHP: PDO, PDO_MySQL, MySQLi, JSON, mbstring
+• 50MB de espaço em disco
+
+
+🔧 INSTALAÇÃO MANUAL (ALTERNATIVA)
+══════════════════════════════════════════════════════════════════════════════
+
+Se preferir instalar manualmente:
+
+1. Criar banco de dados:
+   mysql -u root -p
+   CREATE DATABASE aquabeat_boasvindas CHARACTER SET utf8mb4;
+   exit;
+
+2. Importar estrutura:
+   mysql -u root -p aquabeat_boasvindas < database.sql
+
+3. Editar config.php e alterar credenciais:
+   - BV_DB_USER: seu usuário MySQL
+   - BV_DB_PASS: sua senha MySQL
+
+4. Criar usuário admin:
+   mysql -u root -p aquabeat_boasvindas
+   INSERT INTO usuarios (nome, email, senha, tipo) 
+   VALUES ('Admin', 'admin@aquabeat.com.br', MD5('admin123'), 'admin');
+
+5. Acessar: http://seudominio.com.br/caminho/login.php
+
+
+🎯 PRIMEIRO ACESSO
+══════════════════════════════════════════════════════════════════════════════
+
+Após a instalação:
+
+1. Acesse: http://seudominio.com.br/caminho/login.php
+
+2. Use as credenciais criadas no instalador
+   (ou padrão: admin@aquabeat.com.br / admin123)
+
+3. ALTERE A SENHA IMEDIATAMENTE!
+
+4. Crie usuários para sua equipe em: Usuários → Novo Usuário
+
+
+📚 DOCUMENTAÇÃO
+══════════════════════════════════════════════════════════════════════════════
+
+• README.md - Documentação técnica completa
+• GUIA_INSTALACAO.html - Guia visual de instalação
+• manual-boas-vindas-aquabeat.html - Manual para atendentes
+
+
+🔐 SEGURANÇA
+══════════════════════════════════════════════════════════════════════════════
+
+IMPORTANTE - Após instalar:
+
+✅ Alterar senha do administrador
+✅ Remover ou renomear install.php (o instalador faz isso automaticamente)
+✅ Configurar HTTPS (SSL/TLS) em produção
+✅ Fazer backup regular do banco de dados
+✅ Revisar permissões de arquivos (chmod 644 *.php)
+
+
+📊 ESTRUTURA DO SISTEMA
+══════════════════════════════════════════════════════════════════════════════
+
+PÁGINAS PRINCIPAIS:
+• login.php - Autenticação
+• index.php - Dashboard (lista de vendas)
+• boasvindas.php - Atendimento com checklist
+• visualizar.php - Relatório final
+• usuarios.php - Gestão de usuários (admin)
+• relatorios.php - Estatísticas e gráficos (admin)
+
+APIs:
+• api_vendas.php - Buscar vendas
+• api_salvar_boasvindas.php - Salvar atendimento
+• api_salvar_tentativa.php - Registrar tentativas
+• api_tentativas.php - Listar tentativas
+• api_usuario.php - Buscar usuário
+• api_salvar_usuario.php - Salvar usuário
+• api_toggle_usuario.php - Ativar/Desativar
+• api_excluir_usuario.php - Excluir usuário
+
+
+🐛 PROBLEMAS COMUNS
+══════════════════════════════════════════════════════════════════════════════
+
+❌ Erro: "Não consegue conectar ao banco"
+   → Verifique usuário e senha em config.php
+   → Confirme que MySQL está rodando
+
+❌ Erro: "Permissão negada"
+   → Execute: chmod 755 /caminho/do/sistema
+   → Execute: chmod 644 /caminho/do/sistema/*.php
+
+❌ Página em branco
+   → Ative display_errors no PHP
+   → Veja /var/log/apache2/error.log
+   → Verifique extensões PHP (php -m)
+
+❌ Vendas não aparecem
+   → Verifique credenciais do banco externo em config.php
+   → Confirme que tabela titulos_analise existe
+
+
+💾 BACKUP RECOMENDADO
+══════════════════════════════════════════════════════════════════════════════
+
+Diário (adicione ao crontab):
+0 2 * * * mysqldump -u usuario -p'senha' aquabeat_boasvindas > /backup/bv_$(date +\%Y\%m\%d).sql
+
+Semanal:
+tar -czf backup_sistema_$(date +\%Y\%m\%d).tar.gz /caminho/do/sistema/*
+
+
+✨ RECURSOS DO SISTEMA
+══════════════════════════════════════════════════════════════════════════════
+
+PARA ATENDENTES:
+• Dashboard com vendas do mês
+• Checklist completo com scripts
+• Scripts personalizados por cliente
+• Registro de tentativas de contato
+• Salvamento automático
+• Visualização de relatórios
+
+PARA ADMINISTRADORES:
+• Tudo que atendentes têm +
+• Gestão completa de usuários
+• Relatórios com gráficos
+• Estatísticas de performance
+• Rankings de consultores
+• Logs de auditoria
+• Análise de tentativas
+
+
+📞 SUPORTE
+══════════════════════════════════════════════════════════════════════════════
+
+• Consulte README.md para documentação completa
+• Abra GUIA_INSTALACAO.html no navegador para guia visual
+• Veja manual-boas-vindas-aquabeat.html para manual do atendente
+• Verifique logs do sistema em caso de erro
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+                    🎉 BOA SORTE COM SEU SISTEMA! 🎉
+                   Desenvolvido com ❤️ para Aquabeat
+
+═══════════════════════════════════════════════════════════════════════════════

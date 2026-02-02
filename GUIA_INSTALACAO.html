@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia Rápido de Instalação - Sistema Boas-Vindas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #667eea;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        h3 {
+            color: #764ba2;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .step strong {
+            color: #1e3c72;
+            font-size: 1.1em;
+        }
+        code {
+            background: #e9ecef;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+        }
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .alert-warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+        .alert-success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            color: #0c5460;
+        }
+        ul, ol {
+            margin-left: 30px;
+            margin-top: 10px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            margin: -40px -40px 30px -40px;
+            border-radius: 15px 15px 0 0;
+            text-align: center;
+        }
+        .icon {
+            font-size: 60px;
+            margin-bottom: 10px;
+        }
+        @media print {
+            body {
+                background: white;
+            }
+            .container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">🎉</div>
+            <h1 style="color: white;">Sistema de Boas-Vindas Aquabeat</h1>
+            <p>Guia Rápido de Instalação</p>
+        </div>
+
+        <div class="alert alert-info">
+            <strong>📖 O que você encontrará neste guia:</strong><br>
+            Passo a passo completo para instalar o Sistema de Boas-Vindas em poucos minutos usando o instalador automático.
+        </div>
+
+        <h2>📋 Antes de Começar</h2>
+
+        <h3>Requisitos Mínimos:</h3>
+        <ul>
+            <li><strong>Servidor Web:</strong> Apache 2.4+ ou Nginx</li>
+            <li><strong>PHP:</strong> 7.4 ou superior</li>
+            <li><strong>MySQL:</strong> 5.7 ou superior (ou MariaDB 10.2+)</li>
+            <li><strong>Extensões PHP:</strong> PDO, PDO_MySQL, MySQLi, JSON, mbstring</li>
+            <li><strong>Espaço em disco:</strong> Mínimo 50MB</li>
+        </ul>
+
+        <h3>O que você precisa ter em mãos:</h3>
+        <ul>
+            <li>Credenciais do banco de dados (usuário e senha)</li>
+            <li>Acesso ao servidor via FTP/SSH</li>
+            <li>Permissões de escrita no diretório</li>
+        </ul>
+
+        <h2>🚀 Instalação Automática (Recomendado)</h2>
+
+        <div class="step">
+            <strong>Passo 1:</strong> Fazer Upload dos Arquivos
+        </div>
+        <p>Extraia o arquivo <code>sistema-boasvindas-aquabeat.zip</code> e faça upload de todos os arquivos para o servidor.</p>
+        
+        <div class="alert alert-warning">
+            <strong>⚠️ Importante:</strong> Mantenha a estrutura de diretórios. Todos os arquivos devem estar na mesma pasta.
+        </div>
+
+        <div class="step">
+            <strong>Passo 2:</strong> Acessar o Instalador
+        </div>
+        <p>Abra seu navegador e acesse:</p>
+        <div class="code-block">http://seudominio.com.br/caminho-do-sistema/install.php</div>
+        <p>Ou se estiver em localhost:</p>
+        <div class="code-block">http://localhost/boasvindas/install.php</div>
+
+        <div class="step">
+            <strong>Passo 3:</strong> Verificação de Requisitos
+        </div>
+        <p>O instalador irá verificar automaticamente:</p>
+        <ul>
+            <li>✅ Versão do PHP</li>
+            <li>✅ Extensões necessárias</li>
+            <li>✅ Permissões de escrita</li>
+        </ul>
+        <p>Se tudo estiver OK (verde), clique em <strong>"Próxima Etapa"</strong>.</p>
+        <p>Se houver erros (vermelho), corrija conforme indicado e recarregue a página.</p>
+
+        <div class="step">
+            <strong>Passo 4:</strong> Configuração do Sistema
+        </div>
+        <p>Preencha os dados solicitados:</p>
+
+        <h4>Banco de Dados do Sistema:</h4>
+        <ul>
+            <li><strong>Host:</strong> localhost (ou IP do servidor MySQL)</li>
+            <li><strong>Nome do Banco:</strong> aquabeat_boasvindas (ou nome desejado)</li>
+            <li><strong>Usuário:</strong> usuário do MySQL</li>
+            <li><strong>Senha:</strong> senha do MySQL</li>
+        </ul>
+
+        <h4>Banco de Dados Externo (API - Vendas):</h4>
+        <ul>
+            <li><strong>Host:</strong> localhost</li>
+            <li><strong>Nome do Banco:</strong> mcaq_auditoria</li>
+            <li><strong>Usuário:</strong> mcaq_auditoria</li>
+            <li><strong>Senha:</strong> sign@2023DS</li>
+        </ul>
+
+        <h4>Usuário Administrador Inicial:</h4>
+        <ul>
+            <li><strong>Nome:</strong> Seu nome</li>
+            <li><strong>E-mail:</strong> seu@email.com</li>
+            <li><strong>Senha:</strong> Escolha uma senha forte</li>
+        </ul>
+
+        <div class="alert alert-warning">
+            <strong>🔐 Segurança:</strong> Escolha uma senha forte para o administrador! Você poderá alterá-la depois.
+        </div>
+
+        <div class="step">
+            <strong>Passo 5:</strong> Instalação Automática
+        </div>
+        <p>O instalador irá:</p>
+        <ul>
+            <li>✅ Criar o banco de dados</li>
+            <li>✅ Criar todas as tabelas</li>
+            <li>✅ Inserir dados iniciais</li>
+            <li>✅ Criar o usuário administrador</li>
+            <li>✅ Gerar o arquivo config.php</li>
+            <li>✅ Desativar o instalador por segurança</li>
+        </ul>
+
+        <div class="step">
+            <strong>Passo 6:</strong> Concluído!
+        </div>
+        <p>Clique em <strong>"Acessar o Sistema"</strong> e faça login com as credenciais cadastradas.</p>
+
+        <div class="alert alert-success">
+            <strong>🎉 Pronto!</strong> O sistema está instalado e pronto para uso!
+        </div>
+
+        <h2>🔧 Instalação Manual (Avançado)</h2>
+
+        <p>Se preferir instalar manualmente ou o instalador automático não funcionar:</p>
+
+        <div class="step">
+            <strong>1.</strong> Criar Banco de Dados Manualmente
+        </div>
+        <div class="code-block">mysql -u root -p
+CREATE DATABASE aquabeat_boasvindas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+exit;</div>
+
+        <div class="step">
+            <strong>2.</strong> Importar Estrutura
+        </div>
+        <div class="code-block">mysql -u root -p aquabeat_boasvindas < database.sql</div>
+
+        <div class="step">
+            <strong>3.</strong> Configurar config.php
+        </div>
+        <p>Edite o arquivo <code>config.php</code> e altere as credenciais:</p>
+        <div class="code-block">define('BV_DB_HOST', 'localhost');
+define('BV_DB_NAME', 'aquabeat_boasvindas');
+define('BV_DB_USER', 'seu_usuario');
+define('BV_DB_PASS', 'sua_senha');</div>
+
+        <div class="step">
+            <strong>4.</strong> Criar Usuário Admin
+        </div>
+        <div class="code-block">mysql -u root -p aquabeat_boasvindas
+INSERT INTO usuarios (nome, email, senha, tipo) 
+VALUES ('Admin', 'admin@aquabeat.com.br', MD5('admin123'), 'admin');</div>
+
+        <h2>🐛 Problemas Comuns</h2>
+
+        <h3>❌ Erro: "Não consegue conectar ao banco"</h3>
+        <ul>
+            <li>Verifique se o MySQL está rodando</li>
+            <li>Confirme usuário e senha</li>
+            <li>Teste conexão: <code>mysql -u usuario -p</code></li>
+        </ul>
+
+        <h3>❌ Erro: "Permissão negada"</h3>
+        <div class="code-block">chmod 755 /caminho/do/sistema
+chmod 644 /caminho/do/sistema/*.php</div>
+
+        <h3>❌ Página em branco</h3>
+        <ul>
+            <li>Ative display_errors no PHP</li>
+            <li>Veja o log: <code>/var/log/apache2/error.log</code></li>
+            <li>Verifique extensões PHP instaladas</li>
+        </ul>
+
+        <h3>❌ Vendas não aparecem</h3>
+        <ul>
+            <li>Verifique credenciais do banco externo em config.php</li>
+            <li>Confirme que a tabela <code>titulos_analise</code> existe</li>
+            <li>Teste conexão com banco externo</li>
+        </ul>
+
+        <h2>✅ Pós-Instalação</h2>
+
+        <div class="step">
+            <strong>1.</strong> Primeiro Acesso
+        </div>
+        <ul>
+            <li>Faça login com as credenciais criadas</li>
+            <li>Altere IMEDIATAMENTE a senha do administrador</li>
+            <li>Verifique se o sistema está carregando corretamente</li>
+        </ul>
+
+        <div class="step">
+            <strong>2.</strong> Criar Usuários
+        </div>
+        <ul>
+            <li>Acesse <strong>Usuários</strong> no menu</li>
+            <li>Crie contas para os atendentes</li>
+            <li>Defina permissões adequadas</li>
+        </ul>
+
+        <div class="step">
+            <strong>3.</strong> Testar o Fluxo
+        </div>
+        <ul>
+            <li>Faça um teste completo de boas-vindas</li>
+            <li>Verifique se os dados estão sendo salvos</li>
+            <li>Teste os relatórios</li>
+        </ul>
+
+        <div class="step">
+            <strong>4.</strong> Configurar Backup
+        </div>
+        <div class="code-block"># Adicionar ao crontab (backup diário às 2h)
+0 2 * * * mysqldump -u usuario -p'senha' aquabeat_boasvindas > /backups/bv_$(date +\%Y\%m\%d).sql</div>
+
+        <h2>🔐 Segurança em Produção</h2>
+
+        <div class="alert alert-warning">
+            <strong>Checklist de Segurança:</strong>
+            <ul style="margin-bottom: 0;">
+                <li>✅ Alterar senha padrão do admin</li>
+                <li>✅ Usar HTTPS (SSL/TLS)</li>
+                <li>✅ Implementar bcrypt para senhas (ao invés de MD5)</li>
+                <li>✅ Configurar firewall do MySQL</li>
+                <li>✅ Fazer backups regulares</li>
+                <li>✅ Manter PHP e MySQL atualizados</li>
+                <li>✅ Revisar permissões de arquivos</li>
+                <li>✅ Remover install.php.bak do servidor</li>
+            </ul>
+        </div>
+
+        <h2>📞 Suporte</h2>
+
+        <p>Para dúvidas ou problemas:</p>
+        <ul>
+            <li>📖 Consulte o <code>README.md</code> completo</li>
+            <li>📄 Veja o <code>manual-boas-vindas-aquabeat.html</code></li>
+            <li>🔍 Verifique os logs do sistema</li>
+            <li>💬 Entre em contato com o desenvolvedor</li>
+        </ul>
+
+        <div class="alert alert-success" style="margin-top: 40px; text-align: center;">
+            <strong>🎉 Boa sorte com seu Sistema de Boas-Vindas! 🎉</strong><br>
+            Desenvolvido com ❤️ para Aquabeat
+        </div>
+    </div>
+</body>
+</html>
