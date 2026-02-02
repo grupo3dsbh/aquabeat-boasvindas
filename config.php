@@ -1,151 +1,170 @@
 <?php
 /**
  * SISTEMA DE BOAS-VINDAS AQUABEAT
- * Arquivo de Configuracao
+ * Arquivo de Configuração
+ * Gerado automaticamente pelo instalador
  */
 
-// Configuracoes do Sistema de Boas-Vindas
+// Configurações do Sistema de Boas-Vindas
 define('BV_DB_HOST', 'localhost');
 define('BV_DB_NAME', 'mcaq_uaboasvindas');
-define('BV_DB_USER', 'root');
-define('BV_DB_PASS', '');
+define('BV_DB_USER', 'mcaq_uaboasvindas');
+define('BV_DB_PASS', 'sign@3DS');
 define('BV_DB_CHARSET', 'utf8mb4');
 
-// Configuracoes da API Externa (banco de auditoria)
+// Configurações da API Externa (banco de auditoria)
 define('API_DB_HOST', 'localhost');
-define('API_DB_NAME', 'mcaq_uabeat');
-define('API_DB_USER', 'root');
-define('API_DB_PASS', '');
+define('API_DB_NAME', 'mcaq_auditoria');
+define('API_DB_USER', 'mcaq_auditoria');
+define('API_DB_PASS', 'sign@2023DS');
 define('API_DB_CHARSET', 'utf8mb4');
 
-// Configuracoes Gerais
-define('SITE_URL', 'http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . dirname($_SERVER['PHP_SELF'] ?? ''));
+// Configurações Gerais
+define('SITE_URL', 'http://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']));
 define('TIMEZONE', 'America/Sao_Paulo');
 date_default_timezone_set(TIMEZONE);
 
-// Iniciar sessao
+// Modo de Desenvolvimento (true = desenvolvimento, false = produção)
+// ALTERE PARA false EM PRODUÇÃO!
+define('DESENVOLVIMENTO', true);
+
+// Configurar exibição de erros baseado no modo
+if (DESENVOLVIMENTO) {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+} else {
+    error_reporting(0);
+    ini_set('display_errors', 0);
+    ini_set('display_startup_errors', 0);
+}
+
+// Iniciar sessão
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 /**
- * Classe de Conexao com Banco de Dados
+ * Classe de Conexão com Banco de Dados
  */
 class Database {
-    private static $connectionBV = null;
-    private static $connectionAPI = null;
+    private static $instance_bv = null;
+    private static $instance_api = null;
 
     /**
-     * Obter conexao com o banco de Boas-Vindas
+     * Conexão com banco de Boas-Vindas
      */
     public static function getConnectionBV() {
-        if (self::$connectionBV === null) {
+        if (self::$instance_bv === null) {
             try {
                 $dsn = "mysql:host=" . BV_DB_HOST . ";dbname=" . BV_DB_NAME . ";charset=" . BV_DB_CHARSET;
-                self::$connectionBV = new PDO($dsn, BV_DB_USER, BV_DB_PASS, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false
-                ]);
+                self::$instance_bv = new PDO($dsn, BV_DB_USER, BV_DB_PASS);
+                self::$instance_bv->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                self::$instance_bv->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
             } catch (PDOException $e) {
-                die("Erro de conexao com banco BV: " . $e->getMessage());
+                die("Erro na conexão com banco de Boas-Vindas: " . $e->getMessage());
             }
         }
-        return self::$connectionBV;
+        return self::$instance_bv;
     }
 
     /**
-     * Obter conexao com o banco da API Externa
+     * Conexão com banco da API (auditoria)
      */
     public static function getConnectionAPI() {
-        if (self::$connectionAPI === null) {
+        if (self::$instance_api === null) {
             try {
                 $dsn = "mysql:host=" . API_DB_HOST . ";dbname=" . API_DB_NAME . ";charset=" . API_DB_CHARSET;
-                self::$connectionAPI = new PDO($dsn, API_DB_USER, API_DB_PASS, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false
-                ]);
+                self::$instance_api = new PDO($dsn, API_DB_USER, API_DB_PASS);
+                self::$instance_api->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                self::$instance_api->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
             } catch (PDOException $e) {
-                die("Erro de conexao com banco API: " . $e->getMessage());
+                die("Erro na conexão com banco de API: " . $e->getMessage());
             }
         }
-        return self::$connectionAPI;
+        return self::$instance_api;
     }
 }
 
 /**
- * Classe de Autenticacao
+ * Classe de Autenticação
  */
 class Auth {
+
     /**
-     * Verificar se usuario esta logado
+     * Verificar se usuário está logado
      */
     public static function check() {
-        return isset($_SESSION['usuario_id']) && !empty($_SESSION['usuario_id']);
+        return isset($_SESSION['usuario_id']) && isset($_SESSION['usuario_tipo']);
+    }
+
+    /**
+     * Verificar se é admin
+     */
+    public static function isAdmin() {
+        return self::check() && $_SESSION['usuario_tipo'] === 'admin';
+    }
+
+    /**
+     * Obter ID do usuário logado
+     */
+    public static function getUserId() {
+        return $_SESSION['usuario_id'] ?? null;
+    }
+
+    /**
+     * Obter nome do usuário logado
+     */
+    public static function getUserName() {
+        return $_SESSION['usuario_nome'] ?? null;
+    }
+
+    /**
+     * Obter tipo do usuário logado
+     */
+    public static function getUserType() {
+        return $_SESSION['usuario_tipo'] ?? null;
     }
 
     /**
      * Fazer login
      */
     public static function login($email, $senha) {
-        try {
-            $db = Database::getConnectionBV();
+        $db = Database::getConnectionBV();
 
-            $stmt = $db->prepare("
-                SELECT id, nome, email, tipo, ativo
-                FROM usuarios
-                WHERE email = :email AND senha = MD5(:senha) AND ativo = 1
-            ");
+        $stmt = $db->prepare("
+            SELECT id, nome, email, tipo, ativo
+            FROM usuarios
+            WHERE email = :email AND senha = MD5(:senha) AND ativo = 1
+        ");
 
-            $stmt->execute([
-                ':email' => $email,
-                ':senha' => $senha
-            ]);
+        $stmt->execute([
+            ':email' => $email,
+            ':senha' => $senha
+        ]);
 
-            $usuario = $stmt->fetch();
+        $usuario = $stmt->fetch();
 
-            if ($usuario) {
-                $_SESSION['usuario_id'] = $usuario['id'];
-                $_SESSION['usuario_nome'] = $usuario['nome'];
-                $_SESSION['usuario_email'] = $usuario['email'];
-                $_SESSION['usuario_tipo'] = $usuario['tipo'];
-
-                // Registrar log de login
-                Logger::log('login', 'Usuario fez login');
-
-                return true;
-            }
-
-            return false;
-        } catch (PDOException $e) {
-            return false;
+        if ($usuario) {
+            $_SESSION['usuario_id'] = $usuario['id'];
+            $_SESSION['usuario_nome'] = $usuario['nome'];
+            $_SESSION['usuario_email'] = $usuario['email'];
+            $_SESSION['usuario_tipo'] = $usuario['tipo'];
+            return true;
         }
+
+        return false;
     }
 
     /**
      * Fazer logout
      */
     public static function logout() {
-        if (self::check()) {
-            Logger::log('logout', 'Usuario fez logout');
-        }
-
-        $_SESSION = [];
-
-        if (ini_get("session.use_cookies")) {
-            $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000,
-                $params["path"], $params["domain"],
-                $params["secure"], $params["httponly"]
-            );
-        }
-
         session_destroy();
     }
 
     /**
-     * Exigir login - redireciona se nao estiver logado
+     * Redirecionar se não estiver logado
      */
     public static function requireLogin() {
         if (!self::check()) {
@@ -155,43 +174,14 @@ class Auth {
     }
 
     /**
-     * Exigir admin - redireciona se nao for admin
+     * Redirecionar se não for admin
      */
     public static function requireAdmin() {
         self::requireLogin();
-
         if (!self::isAdmin()) {
             header('Location: index.php');
             exit;
         }
-    }
-
-    /**
-     * Obter ID do usuario logado
-     */
-    public static function getUserId() {
-        return $_SESSION['usuario_id'] ?? null;
-    }
-
-    /**
-     * Obter nome do usuario logado
-     */
-    public static function getUserName() {
-        return $_SESSION['usuario_nome'] ?? '';
-    }
-
-    /**
-     * Obter email do usuario logado
-     */
-    public static function getUserEmail() {
-        return $_SESSION['usuario_email'] ?? '';
-    }
-
-    /**
-     * Verificar se usuario e admin
-     */
-    public static function isAdmin() {
-        return isset($_SESSION['usuario_tipo']) && $_SESSION['usuario_tipo'] === 'admin';
     }
 }
 
@@ -199,112 +189,115 @@ class Auth {
  * Classe de Log de Atividades
  */
 class Logger {
+
     /**
      * Registrar log de atividade
      */
-    public static function log($acao, $descricao, $entidade_tipo = null, $entidade_id = null) {
-        try {
-            $db = Database::getConnectionBV();
+    public static function log($boas_vindas_id, $tipo_acao, $descricao, $dados_alterados = null) {
+        $db = Database::getConnectionBV();
 
-            $stmt = $db->prepare("
-                INSERT INTO logs_atividades (usuario_id, acao, descricao, entidade_tipo, entidade_id, ip, criado_em)
-                VALUES (:usuario_id, :acao, :descricao, :entidade_tipo, :entidade_id, :ip, NOW())
-            ");
+        $stmt = $db->prepare("
+            INSERT INTO logs_atividades
+            (boas_vindas_id, usuario_id, tipo_acao, descricao, dados_alterados, ip_usuario, user_agent)
+            VALUES
+            (:boas_vindas_id, :usuario_id, :tipo_acao, :descricao, :dados_alterados, :ip_usuario, :user_agent)
+        ");
 
-            $stmt->execute([
-                ':usuario_id' => Auth::getUserId(),
-                ':acao' => $acao,
-                ':descricao' => $descricao,
-                ':entidade_tipo' => $entidade_tipo,
-                ':entidade_id' => $entidade_id,
-                ':ip' => $_SERVER['REMOTE_ADDR'] ?? null
-            ]);
-        } catch (PDOException $e) {
-            // Silenciar erros de log para nao interromper a aplicacao
-        }
+        $stmt->execute([
+            ':boas_vindas_id' => $boas_vindas_id,
+            ':usuario_id' => Auth::getUserId(),
+            ':tipo_acao' => $tipo_acao,
+            ':descricao' => $descricao,
+            ':dados_alterados' => $dados_alterados ? json_encode($dados_alterados) : null,
+            ':ip_usuario' => $_SERVER['REMOTE_ADDR'] ?? null,
+            ':user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null
+        ]);
     }
 }
 
 /**
- * Funcoes Auxiliares
+ * Funções auxiliares
  */
 
 /**
- * Enviar resposta JSON
- */
-function jsonResponse($data, $statusCode = 200) {
-    http_response_code($statusCode);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-/**
- * Formatar data
+ * Formatar data para exibição
  */
 function formatarData($data, $formato = 'd/m/Y H:i') {
-    if (empty($data)) {
-        return '-';
-    }
-
-    try {
-        $dt = new DateTime($data);
-        return $dt->format($formato);
-    } catch (Exception $e) {
-        return $data;
-    }
+    if (!$data) return '-';
+    return date($formato, strtotime($data));
 }
 
 /**
- * Formatar valor monetario
+ * Formatar moeda
  */
 function formatarMoeda($valor) {
-    if ($valor === null || $valor === '') {
-        return 'R$ 0,00';
-    }
-    return 'R$ ' . number_format((float)$valor, 2, ',', '.');
-}
-
-/**
- * Formatar CPF/CNPJ
- */
-function formatarDocumento($documento) {
-    if (empty($documento)) {
-        return '-';
-    }
-
-    // Remover caracteres nao numericos
-    $doc = preg_replace('/[^0-9]/', '', $documento);
-
-    if (strlen($doc) == 11) {
-        // CPF: 000.000.000-00
-        return preg_replace('/(\d{3})(\d{3})(\d{3})(\d{2})/', '$1.$2.$3-$4', $doc);
-    } elseif (strlen($doc) == 14) {
-        // CNPJ: 00.000.000/0000-00
-        return preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $doc);
-    }
-
-    return $documento;
+    if ($valor === null) return '-';
+    return 'R$ ' . number_format($valor, 2, ',', '.');
 }
 
 /**
  * Formatar telefone
  */
 function formatarTelefone($telefone) {
-    if (empty($telefone)) {
-        return '-';
-    }
+    if (!$telefone) return '-';
+    $telefone = preg_replace('/[^0-9]/', '', $telefone);
 
-    // Remover caracteres nao numericos
-    $tel = preg_replace('/[^0-9]/', '', $telefone);
-
-    if (strlen($tel) == 11) {
-        // Celular: (00) 00000-0000
-        return preg_replace('/(\d{2})(\d{5})(\d{4})/', '($1) $2-$3', $tel);
-    } elseif (strlen($tel) == 10) {
-        // Fixo: (00) 0000-0000
-        return preg_replace('/(\d{2})(\d{4})(\d{4})/', '($1) $2-$3', $tel);
+    if (strlen($telefone) == 11) {
+        return '(' . substr($telefone, 0, 2) . ') ' . substr($telefone, 2, 5) . '-' . substr($telefone, 7);
+    } elseif (strlen($telefone) == 10) {
+        return '(' . substr($telefone, 0, 2) . ') ' . substr($telefone, 2, 4) . '-' . substr($telefone, 6);
     }
 
     return $telefone;
+}
+
+/**
+ * Formatar CPF/CNPJ
+ */
+function formatarDocumento($doc) {
+    if (!$doc) return '-';
+    $doc = preg_replace('/[^0-9]/', '', $doc);
+
+    if (strlen($doc) == 11) {
+        // CPF
+        return substr($doc, 0, 3) . '.' . substr($doc, 3, 3) . '.' . substr($doc, 6, 3) . '-' . substr($doc, 9, 2);
+    } elseif (strlen($doc) == 14) {
+        // CNPJ
+        return substr($doc, 0, 2) . '.' . substr($doc, 2, 3) . '.' . substr($doc, 5, 3) . '/' . substr($doc, 8, 4) . '-' . substr($doc, 12, 2);
+    }
+
+    return $doc;
+}
+
+/**
+ * Gerar badge de status
+ */
+function badgeStatus($status) {
+    $badges = [
+        'pendente' => '<span class="badge bg-warning">Pendente</span>',
+        'em_andamento' => '<span class="badge bg-info">Em Andamento</span>',
+        'concluido' => '<span class="badge bg-success">Concluído</span>'
+    ];
+
+    return $badges[$status] ?? '<span class="badge bg-secondary">-</span>';
+}
+
+/**
+ * Calcular dias desde a venda
+ */
+function diasDesdeVenda($data_venda) {
+    if (!$data_venda) return 0;
+    $data1 = new DateTime($data_venda);
+    $data2 = new DateTime();
+    return $data1->diff($data2)->days;
+}
+
+/**
+ * Enviar resposta JSON
+ */
+function jsonResponse($data, $status = 200) {
+    http_response_code($status);
+    header('Content-Type: application/json');
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    exit;
 }
