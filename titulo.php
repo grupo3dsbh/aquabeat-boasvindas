@@ -131,6 +131,9 @@ $progresso = $total_obrig > 0 ? round(($completos_obrig / $total_obrig) * 100) :
 // Função para substituir variáveis
 function substituirVars($tpl, $titulo, $configs) {
     if (!$tpl) return '';
+    // Formatar valor sem prefixo R$ para evitar duplicação
+    $valor_num = $titulo['valor_total'] ?? 0;
+    $valor_formatado = number_format($valor_num, 2, ',', '.');
     $subs = [
         '{NOME}' => $titulo['nome_cliente'] ?? '',
         '{NUMERO_TITULO}' => $titulo['numero_titulo'] ?? '',
@@ -140,7 +143,7 @@ function substituirVars($tpl, $titulo, $configs) {
         '{EMAIL}' => $titulo['email'] ?? '',
         '{DATA_VENDA}' => formatarData($titulo['data_venda'] ?? '', 'd/m/Y'),
         '{TIPO_TITULO}' => $titulo['tipo_titulo'] ?? '',
-        '{VALOR}' => formatarMoeda($titulo['valor_total'] ?? 0),
+        '{VALOR}' => $valor_formatado, // Sem R$ para evitar "R$ R$"
         '{FORMA_PAGAMENTO}' => $titulo['forma_pagamento'] ?? '',
         '{PROMOTOR}' => $titulo['promotor'] ?? '',
         '{ATENDENTE}' => Auth::getUserName(),
@@ -149,6 +152,18 @@ function substituirVars($tpl, $titulo, $configs) {
         '{DIA_VENCIMENTO}' => '10'
     ];
     return str_replace(array_keys($subs), array_values($subs), $tpl);
+}
+
+// Verificar se é um script válido (não é JSON de configuração)
+function isValidScript($script) {
+    if (!$script || trim($script) === '') return false;
+    // Se começa com { e termina com }, provavelmente é JSON de configuração
+    $trimmed = trim($script);
+    if (preg_match('/^\{.*\}$/s', $trimmed)) {
+        $decoded = json_decode($trimmed, true);
+        if ($decoded !== null) return false; // É JSON válido, não mostrar como script
+    }
+    return true;
 }
 ?>
 <!DOCTYPE html>
@@ -478,7 +493,9 @@ function substituirVars($tpl, $titulo, $configs) {
                                 <?php if ($etapa['tipo_campo'] === 'select' && isset($opcoes['opcoes'])): ?>
                                     <?php
                                     $opts = $opcoes['opcoes'];
-                                    $is_binary = count($opts) <= 3 && (in_array('Sim', $opts) || in_array('Não', $opts));
+                                    // Detectar se deve usar radio buttons (opções binárias ou ternárias simples)
+                                    $binary_keywords = ['Sim', 'Não', 'Positivo', 'Negativo', 'Neutro', 'Atendido', 'Retornar'];
+                                    $is_binary = count($opts) <= 4 && count(array_intersect($opts, $binary_keywords)) > 0;
                                     ?>
                                     <?php if ($is_binary): ?>
                                     <!-- Radio buttons para Sim/Não -->
@@ -524,7 +541,7 @@ function substituirVars($tpl, $titulo, $configs) {
                                 </div>
                                 <?php endif; ?>
 
-                                <?php if ($script && $etapa['tipo_campo'] !== 'select'): ?>
+                                <?php if (isValidScript($script)): ?>
                                 <div class="script-box">
                                     <button class="btn btn-sm btn-outline-warning copy-btn" onclick="copiarScript(this)">
                                         <i class="bi bi-clipboard"></i> Copiar
@@ -629,25 +646,72 @@ function substituirVars($tpl, $titulo, $configs) {
 
     document.querySelectorAll('.checklist-textarea, .checklist-texto').forEach(el => {
         el.addEventListener('blur', function() {
-            salvarInteracao(this.dataset.codigo, null, this.value, null);
+            const codigo = this.dataset.codigo;
+            const hasValue = this.value.trim() !== '';
+            // Se tem valor, também marcar o checkbox como completo
+            if (hasValue) {
+                const cb = document.getElementById('check_' + codigo);
+                if (cb && !cb.checked) {
+                    cb.checked = true;
+                    salvarInteracao(codigo, 1, this.value, null);
+                } else {
+                    salvarInteracao(codigo, null, this.value, null);
+                }
+            } else {
+                salvarInteracao(codigo, null, this.value, null);
+            }
         });
     });
 
     document.querySelectorAll('.checklist-numero').forEach(el => {
         el.addEventListener('blur', function() {
-            salvarInteracao(this.dataset.codigo, null, null, this.value);
+            const codigo = this.dataset.codigo;
+            const hasValue = this.value.trim() !== '';
+            // Se tem valor, também marcar o checkbox como completo
+            if (hasValue) {
+                const cb = document.getElementById('check_' + codigo);
+                if (cb && !cb.checked) {
+                    cb.checked = true;
+                    salvarInteracao(codigo, 1, null, this.value);
+                } else {
+                    salvarInteracao(codigo, null, null, this.value);
+                }
+            } else {
+                salvarInteracao(codigo, null, null, this.value);
+            }
         });
     });
 
     document.querySelectorAll('.checklist-select').forEach(el => {
         el.addEventListener('change', function() {
-            salvarInteracao(this.dataset.codigo, null, this.value, null);
+            const codigo = this.dataset.codigo;
+            const hasValue = this.value.trim() !== '';
+            // Se tem valor, também marcar o checkbox como completo
+            if (hasValue) {
+                const cb = document.getElementById('check_' + codigo);
+                if (cb && !cb.checked) {
+                    cb.checked = true;
+                    salvarInteracao(codigo, 1, this.value, null);
+                } else {
+                    salvarInteracao(codigo, null, this.value, null);
+                }
+            } else {
+                salvarInteracao(codigo, null, this.value, null);
+            }
         });
     });
 
     document.querySelectorAll('.checklist-radio').forEach(el => {
         el.addEventListener('change', function() {
-            salvarInteracao(this.dataset.codigo, null, this.value, null);
+            const codigo = this.dataset.codigo;
+            // Ao selecionar radio, também marcar o checkbox como completo
+            const cb = document.getElementById('check_' + codigo);
+            if (cb && !cb.checked) {
+                cb.checked = true;
+                salvarInteracao(codigo, 1, this.value, null);
+            } else {
+                salvarInteracao(codigo, null, this.value, null);
+            }
         });
     });
 
@@ -659,7 +723,14 @@ function substituirVars($tpl, $titulo, $configs) {
                 this.parentElement.querySelectorAll('i').forEach((s, i) => {
                     s.classList.toggle('active', i < val);
                 });
-                salvarInteracao(codigo, null, null, val);
+                // Também marcar o checkbox como completo
+                const cb = document.getElementById('check_' + codigo);
+                if (cb && !cb.checked) {
+                    cb.checked = true;
+                    salvarInteracao(codigo, 1, null, val);
+                } else {
+                    salvarInteracao(codigo, null, null, val);
+                }
             });
         });
     });
