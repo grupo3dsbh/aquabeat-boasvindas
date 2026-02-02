@@ -7,6 +7,7 @@
 require_once 'config.php';
 Auth::requireAdmin();
 
+$pagina_atual = 'configuracoes';
 $db = Database::getConnectionBV();
 $mensagem = '';
 $tipo_mensagem = '';
@@ -31,22 +32,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Buscar configurações
-$stmt = $db->query("SELECT * FROM configuracoes ORDER BY id");
+// Buscar configurações (excluindo api_endpoint que não é usado)
+$stmt = $db->query("SELECT * FROM configuracoes WHERE chave != 'api_endpoint' ORDER BY id");
 $configuracoes = [];
 while ($row = $stmt->fetch()) {
     $configuracoes[$row['chave']] = $row;
 }
 
-// Testar conexão com banco da API
+// Testar conexão com banco da API e buscar tabelas
 $conexao_api_ok = false;
 $conexao_api_msg = '';
+$tabelas_api = [];
+$tabelas_bv = [];
+
 try {
     $db_api = Database::getConnectionAPI();
     $conexao_api_ok = true;
     $conexao_api_msg = 'Conexão OK';
+
+    // Buscar tabelas do banco API
+    $stmt_tables = $db_api->query("SHOW TABLES");
+    $tabelas_api = $stmt_tables->fetchAll(PDO::FETCH_COLUMN);
 } catch (Exception $e) {
     $conexao_api_msg = 'Erro: ' . $e->getMessage();
+}
+
+// Buscar tabelas do banco BV
+try {
+    $stmt_tables_bv = $db->query("SHOW TABLES");
+    $tabelas_bv = $stmt_tables_bv->fetchAll(PDO::FETCH_COLUMN);
+} catch (Exception $e) {
+    // Silenciar
+}
+
+// Contar registros principais
+$total_usuarios = 0;
+$total_boasvindas = 0;
+$total_logs = 0;
+
+try {
+    $total_usuarios = $db->query("SELECT COUNT(*) FROM usuarios")->fetchColumn();
+    $total_boasvindas = $db->query("SELECT COUNT(*) FROM boas_vindas")->fetchColumn();
+    $total_logs = $db->query("SELECT COUNT(*) FROM logs_atividades")->fetchColumn();
+} catch (Exception $e) {
+    // Silenciar
 }
 ?>
 <!DOCTYPE html>
@@ -73,58 +102,28 @@ try {
             padding: 15px;
             margin-bottom: 15px;
         }
-        .config-item label {
-            font-weight: 600;
-            color: #333;
-        }
-        .config-item small {
-            color: #6c757d;
-        }
+        .config-item label { font-weight: 600; color: #333; }
+        .config-item small { color: #6c757d; }
         .status-badge {
             padding: 8px 15px;
             border-radius: 20px;
             font-weight: 500;
         }
+        .table-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .table-item {
+            padding: 5px 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin: 3px 0;
+            font-size: 0.85rem;
+        }
     </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="index">
-                <i class="bi bi-hand-thumbs-up-fill"></i> Boas-Vindas Aquabeat
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="index"><i class="bi bi-house-fill"></i> Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="usuarios"><i class="bi bi-people-fill"></i> Usuários</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="relatorios"><i class="bi bi-graph-up"></i> Relatórios</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="configuracoes"><i class="bi bi-gear-fill"></i> Configurações</a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-person-circle"></i> <?= htmlspecialchars(Auth::getUserName()) ?>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="perfil"><i class="bi bi-person"></i> Meu Perfil</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="logout"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+    <?php include 'includes/navbar.php'; ?>
 
     <div class="container-fluid mt-4">
         <?php if ($mensagem): ?>
@@ -141,56 +140,93 @@ try {
                 <div class="content-section">
                     <h5 class="mb-4"><i class="bi bi-database"></i> Status das Conexões</h5>
 
+                    <!-- Banco Principal -->
                     <div class="mb-4">
                         <h6>Banco de Dados Principal</h6>
-                        <div class="d-flex align-items-center justify-content-between">
-                            <span>mcaq_uaboasvindas</span>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span><strong><?= BV_DB_NAME ?></strong></span>
                             <span class="status-badge bg-success text-white">
                                 <i class="bi bi-check-circle"></i> Conectado
                             </span>
                         </div>
-                        <small class="text-muted">Host: <?= BV_DB_HOST ?></small>
+                        <small class="text-muted d-block">Host: <?= BV_DB_HOST ?> | User: <?= BV_DB_USER ?></small>
+
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="bi bi-people"></i> <?= $total_usuarios ?> usuários |
+                                <i class="bi bi-clipboard-check"></i> <?= $total_boasvindas ?> boas-vindas |
+                                <i class="bi bi-journal-text"></i> <?= $total_logs ?> logs
+                            </small>
+                        </div>
+
+                        <details class="mt-2">
+                            <summary class="text-primary" style="cursor:pointer">Ver tabelas (<?= count($tabelas_bv) ?>)</summary>
+                            <div class="table-list mt-2">
+                                <?php foreach ($tabelas_bv as $tabela): ?>
+                                <div class="table-item"><i class="bi bi-table"></i> <?= htmlspecialchars($tabela) ?></div>
+                                <?php endforeach; ?>
+                            </div>
+                        </details>
                     </div>
 
+                    <hr>
+
+                    <!-- Banco API -->
                     <div class="mb-4">
-                        <h6>Banco de Dados API (Cotas)</h6>
-                        <div class="d-flex align-items-center justify-content-between">
-                            <span><?= API_DB_NAME ?></span>
+                        <h6>Banco de Dados API (Vendas/Cotas)</h6>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span><strong><?= API_DB_NAME ?></strong></span>
                             <span class="status-badge bg-<?= $conexao_api_ok ? 'success' : 'danger' ?> text-white">
                                 <i class="bi bi-<?= $conexao_api_ok ? 'check-circle' : 'x-circle' ?>"></i>
                                 <?= $conexao_api_ok ? 'Conectado' : 'Erro' ?>
                             </span>
                         </div>
-                        <small class="text-muted">Host: <?= API_DB_HOST ?></small>
+                        <small class="text-muted d-block">Host: <?= API_DB_HOST ?> | User: <?= API_DB_USER ?></small>
+
                         <?php if (!$conexao_api_ok): ?>
                         <div class="alert alert-danger mt-2 mb-0 py-2">
                             <small><?= htmlspecialchars($conexao_api_msg) ?></small>
                         </div>
+                        <?php elseif (count($tabelas_api) > 0): ?>
+                        <details class="mt-2">
+                            <summary class="text-primary" style="cursor:pointer">Ver tabelas (<?= count($tabelas_api) ?>)</summary>
+                            <div class="table-list mt-2">
+                                <?php foreach ($tabelas_api as $tabela): ?>
+                                <div class="table-item">
+                                    <i class="bi bi-table"></i> <?= htmlspecialchars($tabela) ?>
+                                    <?php if ($tabela === 'titulos_analise'): ?>
+                                    <span class="badge bg-success ms-1">usada</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </details>
                         <?php endif; ?>
                     </div>
 
                     <hr>
 
                     <h6>Informações do Sistema</h6>
-                    <table class="table table-sm">
+                    <table class="table table-sm mb-0">
                         <tr><td>PHP Version</td><td><?= phpversion() ?></td></tr>
                         <tr><td>Timezone</td><td><?= TIMEZONE ?></td></tr>
-                        <tr><td>Modo</td><td><?= DESENVOLVIMENTO ? 'Desenvolvimento' : 'Produção' ?></td></tr>
+                        <tr><td>Modo</td><td>
+                            <span class="badge bg-<?= DESENVOLVIMENTO ? 'warning' : 'success' ?>">
+                                <?= DESENVOLVIMENTO ? 'Desenvolvimento' : 'Produção' ?>
+                            </span>
+                        </td></tr>
                     </table>
                 </div>
 
                 <div class="content-section">
-                    <h5 class="mb-4"><i class="bi bi-info-circle"></i> Configuração do Banco API</h5>
+                    <h5 class="mb-3"><i class="bi bi-info-circle"></i> Credenciais do Banco API</h5>
                     <p class="text-muted small">
-                        Para alterar as credenciais de conexão com o banco de dados das cotas,
-                        edite o arquivo <code>config.php</code> no servidor.
+                        Para alterar, edite o arquivo <code>config.php</code> no servidor.
                     </p>
                     <div class="bg-light p-3 rounded">
-                        <code>
-                            API_DB_HOST: <?= API_DB_HOST ?><br>
-                            API_DB_NAME: <?= API_DB_NAME ?><br>
-                            API_DB_USER: <?= API_DB_USER ?>
-                        </code>
+                        <code class="d-block">API_DB_HOST: <?= API_DB_HOST ?></code>
+                        <code class="d-block">API_DB_NAME: <?= API_DB_NAME ?></code>
+                        <code class="d-block">API_DB_USER: <?= API_DB_USER ?></code>
                     </div>
                 </div>
             </div>

@@ -7,6 +7,7 @@
 require_once 'config.php';
 Auth::requireLogin();
 
+$pagina_atual = 'dashboard';
 $db_bv = Database::getConnectionBV();
 
 // Estatisticas do usuario
@@ -59,12 +60,8 @@ $em_andamento = $stmt_andamento->fetchAll();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
-        body {
-            background: #f5f7fa;
-        }
-        .navbar {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        }
+        body { background: #f5f7fa; }
+        .navbar { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
         .stat-card {
             background: white;
             border-radius: 10px;
@@ -76,14 +73,8 @@ $em_andamento = $stmt_andamento->fetchAll();
             transform: translateY(-5px);
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .stat-card .icon {
-            font-size: 2.5rem;
-            opacity: 0.8;
-        }
-        .stat-card .number {
-            font-size: 2rem;
-            font-weight: bold;
-        }
+        .stat-card .icon { font-size: 2.5rem; opacity: 0.8; }
+        .stat-card .number { font-size: 2rem; font-weight: bold; }
         .content-section {
             background: white;
             border-radius: 10px;
@@ -102,71 +93,14 @@ $em_andamento = $stmt_andamento->fetchAll();
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             transform: translateY(-2px);
         }
-        .venda-card.concluido {
-            border-left: 4px solid #28a745;
-            background: #f8fff8;
-        }
-        .venda-card.em-andamento {
-            border-left: 4px solid #ffc107;
-            background: #fffef8;
-        }
-        .venda-card.pendente {
-            border-left: 4px solid #6c757d;
-        }
-        .badge-status {
-            font-size: 0.75rem;
-            padding: 5px 10px;
-        }
+        .venda-card.concluido { border-left: 4px solid #28a745; background: #f8fff8; }
+        .venda-card.em-andamento { border-left: 4px solid #ffc107; background: #fffef8; }
+        .venda-card.pendente { border-left: 4px solid #6c757d; }
+        .badge-status { font-size: 0.75rem; padding: 5px 10px; }
     </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="index">
-                <i class="bi bi-hand-thumbs-up-fill"></i> Boas-Vindas Aquabeat
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="index">
-                            <i class="bi bi-house-fill"></i> Dashboard
-                        </a>
-                    </li>
-                    <?php if (Auth::isAdmin()): ?>
-                    <li class="nav-item">
-                        <a class="nav-link" href="usuarios">
-                            <i class="bi bi-people-fill"></i> Usuarios
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="relatorios">
-                            <i class="bi bi-graph-up"></i> Relatorios
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="configuracoes">
-                            <i class="bi bi-gear-fill"></i> Configuracoes
-                        </a>
-                    </li>
-                    <?php endif; ?>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-person-circle"></i> <?= htmlspecialchars(Auth::getUserName()) ?>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="perfil"><i class="bi bi-person"></i> Meu Perfil</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="logout"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+    <?php include 'includes/navbar.php'; ?>
 
     <div class="container-fluid mt-4">
         <!-- Cards de Estatisticas -->
@@ -178,9 +112,7 @@ $em_andamento = $stmt_andamento->fetchAll();
                             <div class="text-muted mb-1">Meus Atendimentos</div>
                             <div class="number text-primary"><?= $stats_usuario['total'] ?? 0 ?></div>
                         </div>
-                        <div class="icon text-primary">
-                            <i class="bi bi-clipboard-check"></i>
-                        </div>
+                        <div class="icon text-primary"><i class="bi bi-clipboard-check"></i></div>
                     </div>
                 </div>
             </div>
@@ -188,12 +120,10 @@ $em_andamento = $stmt_andamento->fetchAll();
                 <div class="stat-card">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="text-muted mb-1">Concluidos</div>
+                            <div class="text-muted mb-1">Concluídos</div>
                             <div class="number text-success"><?= $stats_usuario['concluidos'] ?? 0 ?></div>
                         </div>
-                        <div class="icon text-success">
-                            <i class="bi bi-check-circle"></i>
-                        </div>
+                        <div class="icon text-success"><i class="bi bi-check-circle"></i></div>
                     </div>
                 </div>
             </div>
@@ -204,23 +134,20 @@ $em_andamento = $stmt_andamento->fetchAll();
                             <div class="text-muted mb-1">Em Andamento</div>
                             <div class="number text-warning"><?= $stats_usuario['em_andamento'] ?? 0 ?></div>
                         </div>
-                        <div class="icon text-warning">
-                            <i class="bi bi-hourglass-split"></i>
-                        </div>
+                        <div class="icon text-warning"><i class="bi bi-hourglass-split"></i></div>
                     </div>
                 </div>
             </div>
         </div>
 
         <?php if (Auth::isAdmin() && $stats_geral): ?>
-        <!-- Estatisticas Gerais (Admin) -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i>
-                    <strong>Ultimos 30 dias:</strong>
+                    <strong>Últimos 30 dias:</strong>
                     <?= $stats_geral['total'] ?> atendimentos |
-                    <?= $stats_geral['concluidos'] ?> concluidos |
+                    <?= $stats_geral['concluidos'] ?> concluídos |
                     <?= $stats_geral['atendentes_ativos'] ?> atendentes ativos
                 </div>
             </div>
@@ -255,10 +182,10 @@ $em_andamento = $stmt_andamento->fetchAll();
                                 </small>
                             </div>
                             <div class="mt-2">
-                                <a href="boasvindas.php?id=<?= $bv['id'] ?>" class="btn btn-sm btn-warning">
+                                <a href="boasvindas?id=<?= $bv['id'] ?>" class="btn btn-sm btn-warning">
                                     <i class="bi bi-arrow-right-circle"></i> Continuar
                                 </a>
-                                <a href="visualizar.php?id=<?= $bv['id'] ?>" class="btn btn-sm btn-outline-secondary">
+                                <a href="visualizar?id=<?= $bv['id'] ?>" class="btn btn-sm btn-outline-secondary">
                                     <i class="bi bi-eye"></i> Ver
                                 </a>
                             </div>
@@ -278,7 +205,7 @@ $em_andamento = $stmt_andamento->fetchAll();
                 <div class="content-section">
                     <h5 class="mb-4">
                         <i class="bi bi-cart-check text-primary"></i>
-                        Vendas do Mes
+                        Vendas do Mês
                     </h5>
 
                     <div id="listaVendas">
@@ -310,11 +237,16 @@ $em_andamento = $stmt_andamento->fetchAll();
                 if (response.success) {
                     renderizarVendas(response.data);
                 } else {
-                    $('#listaVendas').html('<div class="alert alert-danger">Erro ao carregar vendas: ' + response.error + '</div>');
+                    $('#listaVendas').html('<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ' + response.error + '</div>');
                 }
             },
-            error: function(xhr, status, error) {
-                $('#listaVendas').html('<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> Nao foi possivel carregar as vendas do sistema externo. Verifique a conexao com o banco de dados da API.</div>');
+            error: function(xhr) {
+                let msg = 'Não foi possível carregar as vendas.';
+                try {
+                    const resp = JSON.parse(xhr.responseText);
+                    if (resp.error) msg = resp.error;
+                } catch(e) {}
+                $('#listaVendas').html('<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> ' + msg + '</div>');
             }
         });
     }
@@ -327,7 +259,7 @@ $em_andamento = $stmt_andamento->fetchAll();
             lista.html(`
                 <div class="text-center text-muted py-4">
                     <i class="bi bi-calendar-x" style="font-size: 3rem;"></i>
-                    <p class="mt-2">Nenhuma venda encontrada neste mes</p>
+                    <p class="mt-2">Nenhuma venda encontrada neste mês</p>
                 </div>
             `);
             return;
@@ -336,19 +268,19 @@ $em_andamento = $stmt_andamento->fetchAll();
         vendas.forEach(function(venda) {
             let statusClass = 'pendente';
             let statusBadge = '<span class="badge bg-secondary badge-status">Pendente</span>';
-            let actionBtn = `<a href="boasvindas.php?titulo=${venda.numero_titulo}" class="btn btn-sm btn-primary"><i class="bi bi-play-circle"></i> Iniciar</a>`;
+            let actionBtn = `<a href="boasvindas?titulo=${venda.numero_titulo}" class="btn btn-sm btn-primary"><i class="bi bi-play-circle"></i> Iniciar</a>`;
 
             if (venda.boas_vindas_status === 'concluido') {
                 statusClass = 'concluido';
-                statusBadge = '<span class="badge bg-success badge-status">Concluido</span>';
-                actionBtn = `<a href="visualizar.php?id=${venda.boas_vindas_id}" class="btn btn-sm btn-outline-success"><i class="bi bi-eye"></i> Ver</a>`;
+                statusBadge = '<span class="badge bg-success badge-status">Concluído</span>';
+                actionBtn = `<a href="visualizar?id=${venda.boas_vindas_id}" class="btn btn-sm btn-outline-success"><i class="bi bi-eye"></i> Ver</a>`;
             } else if (venda.boas_vindas_status === 'em_andamento') {
                 statusClass = 'em-andamento';
                 statusBadge = '<span class="badge bg-warning badge-status">Em Andamento</span>';
-                actionBtn = `<a href="boasvindas.php?id=${venda.boas_vindas_id}" class="btn btn-sm btn-warning"><i class="bi bi-arrow-right-circle"></i> Continuar</a>`;
+                actionBtn = `<a href="boasvindas?id=${venda.boas_vindas_id}" class="btn btn-sm btn-warning"><i class="bi bi-arrow-right-circle"></i> Continuar</a>`;
             }
 
-            const html = `
+            lista.append(`
                 <div class="venda-card ${statusClass}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -367,13 +299,9 @@ $em_andamento = $stmt_andamento->fetchAll();
                         </small>
                     </div>
                     ${venda.atendente ? '<div class="mt-1"><small class="text-info"><i class="bi bi-person"></i> ' + escapeHtml(venda.atendente) + '</small></div>' : ''}
-                    <div class="mt-2">
-                        ${actionBtn}
-                    </div>
+                    <div class="mt-2">${actionBtn}</div>
                 </div>
-            `;
-
-            lista.append(html);
+            `);
         });
     }
 
