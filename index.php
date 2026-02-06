@@ -671,12 +671,17 @@ $url_params = http_build_query(array_filter([
                         </div>
                     </div>
 
-                    <div id="paginacao_vendas" class="text-center mt-3" style="display: none;">
-                        <button class="btn btn-outline-primary btn-sm" id="btnCarregarMais" onclick="carregarMaisVendas()">
-                            <i class="bi bi-arrow-down-circle"></i> Carregar mais
-                        </button>
-                        <div class="text-muted small mt-1">
+                    <div id="paginacao_vendas" class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top" style="display: none;">
+                        <small class="text-muted">
                             Página <span id="pagina_atual">1</span> de <span id="total_paginas">1</span>
+                        </small>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" id="btnVendasAnterior" onclick="paginaVendasAnterior()" disabled>
+                                <i class="bi bi-chevron-left"></i> Anterior
+                            </button>
+                            <button class="btn btn-outline-primary" id="btnVendasProxima" onclick="paginaVendasProxima()">
+                                Próxima <i class="bi bi-chevron-right"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -933,17 +938,13 @@ $url_params = http_build_query(array_filter([
         carregarVendas();
     }
 
-    function carregarVendas(append = false) {
-        if (!append) {
-            $('#listaVendas').html(`
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="mt-2 text-muted">Carregando vendas...</p>
-                </div>
-            `);
-        } else {
-            $('#btnCarregarMais').prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Carregando...');
-        }
+    function carregarVendas() {
+        $('#listaVendas').html(`
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Carregando vendas...</p>
+            </div>
+        `);
 
         $.ajax({
             url: 'api_vendas.php',
@@ -979,18 +980,14 @@ $url_params = http_build_query(array_filter([
                     $('#pagina_atual').text(paginaAtual);
                     $('#total_paginas').text(totalPaginas);
 
-                    if (append) {
-                        vendasCarregadas = vendasCarregadas.concat(response.data);
-                        renderizarVendas(vendasCarregadas);
-                    } else {
-                        vendasCarregadas = response.data;
-                        renderizarVendas(response.data);
-                    }
+                    vendasCarregadas = response.data;
+                    renderizarVendas(response.data);
 
-                    // Mostrar/esconder botão de carregar mais
-                    if (paginaAtual < totalPaginas) {
-                        $('#paginacao_vendas').show();
-                        $('#btnCarregarMais').prop('disabled', false).html('<i class="bi bi-arrow-down-circle"></i> Carregar mais');
+                    // Atualizar botões de paginação
+                    if (totalPaginas > 1) {
+                        $('#paginacao_vendas').css('display', 'flex');
+                        $('#btnVendasAnterior').prop('disabled', paginaAtual <= 1);
+                        $('#btnVendasProxima').prop('disabled', paginaAtual >= totalPaginas);
                     } else {
                         $('#paginacao_vendas').hide();
                     }
@@ -1005,14 +1002,22 @@ $url_params = http_build_query(array_filter([
                     if (resp.error) msg = resp.error;
                 } catch(e) {}
                 $('#listaVendas').html('<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> ' + msg + '</div>');
-                $('#btnCarregarMais').prop('disabled', false).html('<i class="bi bi-arrow-down-circle"></i> Carregar mais');
             }
         });
     }
 
-    function carregarMaisVendas() {
-        paginaAtual++;
-        carregarVendas(true);
+    function paginaVendasAnterior() {
+        if (paginaAtual > 1) {
+            paginaAtual--;
+            carregarVendas();
+        }
+    }
+
+    function paginaVendasProxima() {
+        if (paginaAtual < totalPaginas) {
+            paginaAtual++;
+            carregarVendas();
+        }
     }
 
     function renderizarVendas(vendas) {

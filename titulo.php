@@ -1373,11 +1373,40 @@ function isValidScript($script) {
                 }
                 // Atualizar satisfação dinamicamente
                 atualizarSatisfacao(this.value);
+                // Atualizar tag vermelha de ciência do título em tempo real
+                atualizarTagCiencia(codigo, this.value);
             } else {
                 salvarInteracao(codigo, null, this.value, null);
             }
         });
     });
+
+    // Função para atualizar a tag vermelha de ciência do título
+    function atualizarTagCiencia(codigo, valor) {
+        const codigosCiencia = ['valid_cliente_ciente', 'valid_ciencia_cota'];
+        if (!codigosCiencia.includes(codigo)) return;
+
+        const respostasNegativas = ['Não', 'Negativo', 'Não, corrigido', 'Não tinha ciência', 'Ficou com dúvida'];
+        const tituloEl = document.getElementById('tituloId')?.closest('h5');
+        const alertaCiencia = document.querySelector('.alert-ciencia');
+
+        if (respostasNegativas.includes(valor)) {
+            // Mostrar tag vermelha
+            if (tituloEl) tituloEl.classList.add('titulo-sem-ciencia');
+            if (!alertaCiencia) {
+                // Criar alerta se não existir
+                const novoAlerta = document.createElement('div');
+                novoAlerta.className = 'alert-ciencia';
+                novoAlerta.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> <strong>ATENÇÃO:</strong> Cliente não tem ciência do título! Verificar situação com o consultor.';
+                const progressRow = document.querySelector('.row.g-2.mb-2');
+                if (progressRow) progressRow.parentNode.insertBefore(novoAlerta, progressRow);
+            }
+        } else if (valor.includes('Sim')) {
+            // Esconder tag vermelha
+            if (tituloEl) tituloEl.classList.remove('titulo-sem-ciencia');
+            if (alertaCiencia) alertaCiencia.remove();
+        }
+    }
 
     document.querySelectorAll('.checklist-radio').forEach(el => {
         el.addEventListener('change', function() {
