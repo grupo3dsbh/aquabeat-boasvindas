@@ -1057,6 +1057,10 @@ function isValidScript($script) {
                             <div class="field-input" style="margin-left: 18px;">
                                 <input type="number" min="0" class="form-control form-control-sm checklist-numero" data-codigo="<?= $etapa['codigo'] ?>" value="<?= htmlspecialchars($val_num) ?>" placeholder="0" style="font-size: 11px;">
                             </div>
+                            <?php elseif ($etapa['tipo_campo'] === 'datetime'): ?>
+                            <div class="field-input" style="margin-left: 18px;">
+                                <input type="datetime-local" class="form-control form-control-sm checklist-texto" data-codigo="<?= $etapa['codigo'] ?>" value="<?= htmlspecialchars($val_txt ? date('Y-m-d\TH:i', strtotime($val_txt)) : '') ?>" style="font-size: 11px;">
+                            </div>
                             <?php elseif ($etapa['tipo_campo'] === 'rating'): ?>
                             <div class="rating-stars" data-codigo="<?= $etapa['codigo'] ?>" style="margin-left: 18px;">
                                 <?php for ($i = 1; $i <= 5; $i++): ?>

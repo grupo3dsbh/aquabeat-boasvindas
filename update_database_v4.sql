@@ -1,6 +1,10 @@
 -- Atualização v4: Corrigir tipos de campos no Registro Pós-Ligação
 -- Execute: mysql -u mcaq_uaboasvindas -p mcaq_uaboasvindas < update_database_v4.sql
 
+-- Primeiro, alterar o ENUM para incluir 'datetime'
+ALTER TABLE checklist_etapas
+MODIFY COLUMN tipo_campo ENUM('checkbox', 'texto', 'numero', 'select', 'textarea', 'telefone', 'rating', 'datetime') DEFAULT 'checkbox';
+
 -- Atualizar tipo de campo para Data/hora da ligação (datetime)
 UPDATE checklist_etapas
 SET tipo_campo = 'datetime',
