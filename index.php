@@ -26,7 +26,8 @@ try {
 } catch (Exception $e) {}
 
 // Filtros ativos
-$filtro_atual = $_GET['periodo'] ?? ($_GET['filtro'] ?? $filtro_padrao);
+// IMPORTANTE: 'periodo' é para datas, 'filtro' é para tipo de atendimento - são parâmetros separados!
+$filtro_atual = $_GET['periodo'] ?? $filtro_padrao;
 $filtro_status_atend = $_GET['status_atend'] ?? 'abertos'; // abertos, concluidos, todos
 $filtro_status_vendas = $_GET['status_vendas'] ?? 'abertos'; // abertos, concluidos, todos
 
