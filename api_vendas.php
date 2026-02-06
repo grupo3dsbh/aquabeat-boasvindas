@@ -36,6 +36,7 @@ try {
     $pagina = max(1, intval($_GET['pagina'] ?? 1));
     $por_pagina = min(200, max(20, intval($_GET['por_pagina'] ?? 50)));
     $offset = ($pagina - 1) * $por_pagina;
+    $busca = trim($_GET['busca'] ?? '');
 
     // Validar datas
     $primeiro_dia_mes = date('Y-m-d 00:00:00', strtotime($data_inicio));
@@ -104,11 +105,34 @@ try {
         $where[] = "usado_relatorios = 1";
     }
 
+    // Adicionar busca por texto
+    if (!empty($busca)) {
+        $busca_parts = [];
+        $tem_busca_doc = false;
+        if (isset($campos_encontrados['numero_titulo'])) {
+            $busca_parts[] = $campos_encontrados['numero_titulo'] . " LIKE :busca";
+        }
+        if (isset($campos_encontrados['nome_cliente'])) {
+            $busca_parts[] = $campos_encontrados['nome_cliente'] . " LIKE :busca";
+        }
+        if (isset($campos_encontrados['documento'])) {
+            $busca_parts[] = $campos_encontrados['documento'] . " LIKE :busca_doc";
+            $tem_busca_doc = true;
+        }
+        if (!empty($busca_parts)) {
+            $where[] = "(" . implode(' OR ', $busca_parts) . ")";
+            $params[':busca'] = "%$busca%";
+            if ($tem_busca_doc) {
+                $params[':busca_doc'] = preg_replace('/[^0-9]/', '', $busca) . '%';
+            }
+        }
+    }
+
     if (!empty($where)) {
         $sql .= " WHERE " . implode(' AND ', $where);
     }
 
-    // Primeiro, contar total de registros
+    // Primeiro, contar total de registros no período (com filtros aplicados)
     $sql_count = "SELECT COUNT(*) as total FROM titulos";
     if (!empty($where)) {
         $sql_count .= " WHERE " . implode(' AND ', $where);

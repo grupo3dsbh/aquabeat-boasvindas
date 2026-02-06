@@ -105,56 +105,169 @@ try {
 
 // Filtro de status para atendimentos
 $status_condition = '';
+$filtro_notificacao = $_GET['filtro'] ?? '';
+$filtro_label_atend = 'Abertos';
+
+// Mapear filtros para labels amigáveis
+$filtros_labels = [
+    'abertos' => 'Abertos',
+    'concluidos' => 'Concluídos',
+    'pendentes' => 'Pendentes',
+    'em_andamento' => 'Em Andamento',
+    'todos' => 'Todos',
+    'followup' => 'Follow-up',
+    'retornos' => 'Retornos',
+    'agendados' => 'Agendados Hoje',
+    'duplicados' => 'CPFs Duplicados'
+];
 
 // Verificar se há filtro especial da barra de notificações
-$filtro_notificacao = $_GET['filtro'] ?? '';
 if ($filtro_notificacao === 'retornos') {
     $status_condition = "AND bv.status IN ('pendente', 'em_andamento') AND bv.resultado_ultimo_contato IN ('nao_atendeu', 'ocupado', 'caixa_postal')";
+    $filtro_label_atend = 'Retornos';
+    $filtro_status_atend = 'retornos';
 } elseif ($filtro_notificacao === 'agendados') {
     $status_condition = "AND bv.status IN ('pendente', 'em_andamento') AND DATE(bv.proxima_tentativa) = CURDATE()";
+    $filtro_label_atend = 'Agendados Hoje';
+    $filtro_status_atend = 'agendados';
 } elseif ($filtro_notificacao === 'pendentes') {
     $status_condition = "AND bv.status = 'pendente' AND DATEDIFF(NOW(), bv.data_venda) > 1";
+    $filtro_label_atend = 'Pendentes (+1 dia)';
+    $filtro_status_atend = 'pendentes_urgentes';
 } elseif ($filtro_notificacao === 'followup') {
     $status_condition = "AND bv.status IN ('pendente', 'em_andamento') AND (
         bv.resultado_ultimo_contato IN ('nao_atendeu', 'ocupado', 'caixa_postal')
         OR (bv.resultado_ultimo_contato IS NULL AND DATEDIFF(NOW(), bv.criado_em) > 0)
         OR DATE(bv.proxima_tentativa) <= CURDATE()
     )";
+    $filtro_label_atend = 'Follow-up';
+    $filtro_status_atend = 'followup';
+} elseif ($filtro_notificacao === 'duplicados') {
+    // Filtro especial para CPFs duplicados - buscar os números de título
+    $titulos_duplicados = [];
+    foreach ($cpfs_duplicados as $dup) {
+        $tits = explode(', ', $dup['titulos']);
+        foreach ($tits as $t) {
+            $titulos_duplicados[] = trim($t);
+        }
+    }
+    if (!empty($titulos_duplicados)) {
+        $placeholders = implode(',', array_fill(0, count($titulos_duplicados), '?'));
+        $status_condition = "AND bv.numero_titulo IN ($placeholders)";
+    }
+    $filtro_label_atend = 'CPFs Duplicados';
+    $filtro_status_atend = 'duplicados';
 } else {
     switch ($filtro_status_atend) {
         case 'abertos':
             $status_condition = "AND bv.status IN ('pendente', 'em_andamento')";
+            $filtro_label_atend = 'Abertos';
             break;
         case 'concluidos':
             $status_condition = "AND bv.status = 'concluido'";
+            $filtro_label_atend = 'Concluídos';
             break;
         case 'pendentes':
             $status_condition = "AND bv.status = 'pendente'";
+            $filtro_label_atend = 'Pendentes';
             break;
         case 'em_andamento':
             $status_condition = "AND bv.status = 'em_andamento'";
+            $filtro_label_atend = 'Em Andamento';
+            break;
+        case 'todos':
+            $status_condition = "";
+            $filtro_label_atend = 'Todos';
+            break;
+        case 'followup':
+            $status_condition = "AND bv.status IN ('pendente', 'em_andamento') AND (
+                bv.resultado_ultimo_contato IN ('nao_atendeu', 'ocupado', 'caixa_postal')
+                OR (bv.resultado_ultimo_contato IS NULL AND DATEDIFF(NOW(), bv.criado_em) > 0)
+                OR DATE(bv.proxima_tentativa) <= CURDATE()
+            )";
+            $filtro_label_atend = 'Follow-up';
             break;
     }
 }
 
-$stmt_andamento = $db_bv->prepare("
-    SELECT bv.*, u.nome as atendente_nome
-    FROM boas_vindas bv
-    LEFT JOIN usuarios u ON bv.usuario_id = u.id
-    WHERE (bv.usuario_id = :usuario_id OR :is_admin = 1)
-    $status_condition
-    ORDER BY
-        CASE WHEN bv.status = 'em_andamento' THEN 0
-             WHEN bv.status = 'pendente' THEN 1
-             ELSE 2 END,
-        bv.data_venda DESC
-    LIMIT 30
-");
-$stmt_andamento->execute([
+// Paginação para Meus Atendimentos
+$pagina_atend = max(1, intval($_GET['pagina_atend'] ?? 1));
+$por_pagina_atend = 20;
+$offset_atend = ($pagina_atend - 1) * $por_pagina_atend;
+
+// Busca textual em Meus Atendimentos
+$busca_atend = trim($_GET['busca_atend'] ?? '');
+$busca_condition = '';
+if (!empty($busca_atend)) {
+    $busca_condition = "AND (bv.numero_titulo LIKE :busca OR bv.nome_cliente LIKE :busca OR bv.documento_cliente LIKE :busca_doc)";
+}
+
+// Contar total de atendimentos
+$sql_count = "SELECT COUNT(*) as total FROM boas_vindas bv WHERE (bv.usuario_id = :usuario_id OR :is_admin = 1) $status_condition $busca_condition";
+
+// Preparar parâmetros
+$params_base = [
     ':usuario_id' => $usuario_id,
     ':is_admin' => Auth::isAdmin() ? 1 : 0
-]);
+];
+if (!empty($busca_atend)) {
+    $params_base[':busca'] = "%$busca_atend%";
+    $params_base[':busca_doc'] = preg_replace('/[^0-9]/', '', $busca_atend) . '%';
+}
+
+// Caso especial para duplicados (com placeholders numéricos)
+if ($filtro_notificacao === 'duplicados' && !empty($titulos_duplicados)) {
+    $sql_count = "SELECT COUNT(*) as total FROM boas_vindas bv WHERE (bv.usuario_id = ? OR ? = 1) AND bv.numero_titulo IN (" . implode(',', array_fill(0, count($titulos_duplicados), '?')) . ")";
+    $params_count = [$usuario_id, Auth::isAdmin() ? 1 : 0];
+    $params_count = array_merge($params_count, $titulos_duplicados);
+    $stmt_count = $db_bv->prepare($sql_count);
+    $stmt_count->execute($params_count);
+} else {
+    $stmt_count = $db_bv->prepare($sql_count);
+    $stmt_count->execute($params_base);
+}
+$total_atend = $stmt_count->fetch()['total'] ?? 0;
+$total_paginas_atend = max(1, ceil($total_atend / $por_pagina_atend));
+
+// Buscar atendimentos com paginação
+if ($filtro_notificacao === 'duplicados' && !empty($titulos_duplicados)) {
+    $sql_atend = "SELECT bv.*, u.nome as atendente_nome
+        FROM boas_vindas bv
+        LEFT JOIN usuarios u ON bv.usuario_id = u.id
+        WHERE (bv.usuario_id = ? OR ? = 1)
+        AND bv.numero_titulo IN (" . implode(',', array_fill(0, count($titulos_duplicados), '?')) . ")
+        ORDER BY bv.data_venda DESC
+        LIMIT $por_pagina_atend OFFSET $offset_atend";
+    $params_atend = [$usuario_id, Auth::isAdmin() ? 1 : 0];
+    $params_atend = array_merge($params_atend, $titulos_duplicados);
+    $stmt_andamento = $db_bv->prepare($sql_atend);
+    $stmt_andamento->execute($params_atend);
+} else {
+    $stmt_andamento = $db_bv->prepare("
+        SELECT bv.*, u.nome as atendente_nome
+        FROM boas_vindas bv
+        LEFT JOIN usuarios u ON bv.usuario_id = u.id
+        WHERE (bv.usuario_id = :usuario_id OR :is_admin = 1)
+        $status_condition
+        $busca_condition
+        ORDER BY
+            CASE WHEN bv.status = 'em_andamento' THEN 0
+                 WHEN bv.status = 'pendente' THEN 1
+                 ELSE 2 END,
+            bv.data_venda DESC
+        LIMIT $por_pagina_atend OFFSET $offset_atend
+    ");
+    $stmt_andamento->execute($params_base);
+}
 $em_andamento = $stmt_andamento->fetchAll();
+
+// Preservar parâmetros da URL para links
+$url_params = http_build_query(array_filter([
+    'periodo' => $filtro_atual,
+    'status_vendas' => $filtro_status_vendas,
+    'data_inicio' => $filtro_atual === 'personalizado' ? $data_inicio : null,
+    'data_fim' => $filtro_atual === 'personalizado' ? $data_fim : null
+]));
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -358,28 +471,59 @@ $em_andamento = $stmt_andamento->fetchAll();
             <!-- Meus Atendimentos -->
             <div class="col-lg-6">
                 <div class="content-section">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">
                             <i class="bi bi-hourglass-split text-warning"></i>
                             Meus Atendimentos
+                            <small class="text-muted" style="font-size: 12px;">(<?= $filtro_label_atend ?>)</small>
                         </h5>
+                        <span class="badge bg-primary"><?= $total_atend ?> título<?= $total_atend != 1 ? 's' : '' ?></span>
+                    </div>
+
+                    <!-- Busca -->
+                    <div class="mb-2">
+                        <form method="GET" class="d-flex gap-2">
+                            <input type="hidden" name="status_atend" value="<?= htmlspecialchars($filtro_status_atend) ?>">
+                            <input type="hidden" name="periodo" value="<?= htmlspecialchars($filtro_atual) ?>">
+                            <input type="hidden" name="status_vendas" value="<?= htmlspecialchars($filtro_status_vendas) ?>">
+                            <?php if ($filtro_notificacao): ?>
+                            <input type="hidden" name="filtro" value="<?= htmlspecialchars($filtro_notificacao) ?>">
+                            <?php endif; ?>
+                            <input type="text" name="busca_atend" class="form-control form-control-sm" placeholder="Buscar por ID, CPF ou nome..." value="<?= htmlspecialchars($busca_atend) ?>" style="border-radius: 20px;">
+                            <button type="submit" class="btn btn-sm btn-outline-primary" style="border-radius: 20px;">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <?php if (!empty($busca_atend)): ?>
+                            <a href="?status_atend=<?= $filtro_status_atend ?>&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?><?= $filtro_notificacao ? '&filtro=' . $filtro_notificacao : '' ?>" class="btn btn-sm btn-outline-secondary" style="border-radius: 20px;">
+                                <i class="bi bi-x"></i>
+                            </a>
+                            <?php endif; ?>
+                        </form>
                     </div>
 
                     <!-- Filtros de Status -->
                     <div class="filter-tabs">
-                        <a href="?status_atend=abertos&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'abertos' ? 'active' : '' ?>">
+                        <a href="?status_atend=abertos&<?= $url_params ?>" class="filter-tab <?= $filtro_status_atend === 'abertos' ? 'active' : '' ?>">
                             <i class="bi bi-folder2-open"></i> Abertos
                         </a>
-                        <a href="?status_atend=pendentes&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'pendentes' ? 'active' : '' ?>">
+                        <a href="?status_atend=pendentes&<?= $url_params ?>" class="filter-tab <?= $filtro_status_atend === 'pendentes' ? 'active' : '' ?>">
                             <i class="bi bi-clock"></i> Pendentes
                         </a>
-                        <a href="?status_atend=em_andamento&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'em_andamento' ? 'active' : '' ?>">
+                        <a href="?status_atend=em_andamento&<?= $url_params ?>" class="filter-tab <?= $filtro_status_atend === 'em_andamento' ? 'active' : '' ?>">
                             <i class="bi bi-play-circle"></i> Em Andamento
                         </a>
-                        <a href="?status_atend=concluidos&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'concluidos' ? 'active' : '' ?>">
+                        <a href="?status_atend=concluidos&<?= $url_params ?>" class="filter-tab <?= $filtro_status_atend === 'concluidos' ? 'active' : '' ?>">
                             <i class="bi bi-check-circle"></i> Concluídos
                         </a>
-                        <a href="?status_atend=todos&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'todos' ? 'active' : '' ?>">
+                        <a href="?status_atend=followup&<?= $url_params ?>" class="filter-tab <?= $filtro_status_atend === 'followup' ? 'active' : '' ?>">
+                            <i class="bi bi-bell"></i> Follow-up
+                        </a>
+                        <?php if (!empty($cpfs_duplicados)): ?>
+                        <a href="?filtro=duplicados&<?= $url_params ?>" class="filter-tab <?= $filtro_notificacao === 'duplicados' ? 'active' : '' ?>">
+                            <i class="bi bi-people"></i> Duplicados
+                        </a>
+                        <?php endif; ?>
+                        <a href="?status_atend=todos&<?= $url_params ?>" class="filter-tab <?= $filtro_status_atend === 'todos' ? 'active' : '' ?>">
                             <i class="bi bi-list"></i> Todos
                         </a>
                     </div>
@@ -424,6 +568,27 @@ $em_andamento = $stmt_andamento->fetchAll();
                             </div>
                         </a>
                         <?php endforeach; ?>
+
+                        <!-- Paginação Meus Atendimentos -->
+                        <?php if ($total_paginas_atend > 1): ?>
+                        <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                            <small class="text-muted">
+                                Página <?= $pagina_atend ?> de <?= $total_paginas_atend ?>
+                            </small>
+                            <div class="btn-group btn-group-sm">
+                                <?php if ($pagina_atend > 1): ?>
+                                <a href="?pagina_atend=<?= $pagina_atend - 1 ?>&status_atend=<?= $filtro_status_atend ?>&<?= $url_params ?><?= $filtro_notificacao ? '&filtro=' . $filtro_notificacao : '' ?><?= !empty($busca_atend) ? '&busca_atend=' . urlencode($busca_atend) : '' ?>" class="btn btn-outline-primary">
+                                    <i class="bi bi-chevron-left"></i> Anterior
+                                </a>
+                                <?php endif; ?>
+                                <?php if ($pagina_atend < $total_paginas_atend): ?>
+                                <a href="?pagina_atend=<?= $pagina_atend + 1 ?>&status_atend=<?= $filtro_status_atend ?>&<?= $url_params ?><?= $filtro_notificacao ? '&filtro=' . $filtro_notificacao : '' ?><?= !empty($busca_atend) ? '&busca_atend=' . urlencode($busca_atend) : '' ?>" class="btn btn-outline-primary">
+                                    Próxima <i class="bi bi-chevron-right"></i>
+                                </a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="text-center text-muted py-4">
                             <i class="bi bi-inbox" style="font-size: 3rem;"></i>
@@ -436,7 +601,7 @@ $em_andamento = $stmt_andamento->fetchAll();
             <!-- Vendas do Periodo -->
             <div class="col-lg-6">
                 <div class="content-section">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">
                             <i class="bi bi-cart-check text-primary"></i>
                             Vendas - <?= $filtro_label ?>
@@ -462,6 +627,19 @@ $em_andamento = $stmt_andamento->fetchAll();
                         <?php endif; ?>
                     </div>
 
+                    <!-- Busca Vendas -->
+                    <div class="mb-2">
+                        <div class="d-flex gap-2">
+                            <input type="text" id="buscaVendas" class="form-control form-control-sm" placeholder="Buscar por ID, CPF ou nome..." style="border-radius: 20px;">
+                            <button type="button" class="btn btn-sm btn-outline-primary" style="border-radius: 20px;" onclick="buscarVendas()">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" style="border-radius: 20px; display: none;" id="btnLimparBuscaVendas" onclick="limparBuscaVendas()">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Filtros de Status Vendas -->
                     <div class="filter-tabs">
                         <a href="?status_vendas=abertos&periodo=<?= $filtro_atual ?>&status_atend=<?= $filtro_status_atend ?>" class="filter-tab <?= $filtro_status_vendas === 'abertos' ? 'active' : '' ?>" onclick="filtrarVendas('abertos'); return false;">
@@ -475,8 +653,12 @@ $em_andamento = $stmt_andamento->fetchAll();
                         </a>
                     </div>
 
-                    <div id="vendas_info" class="d-flex justify-content-between align-items-center mb-2" style="display: none !important;">
-                        <small class="text-muted"><span id="vendas_count">0</span> de <span id="vendas_total">0</span> atendimentos</small>
+                    <div id="vendas_info" class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted">
+                            Exibindo <span id="vendas_count">0</span> de <span id="vendas_total">0</span>
+                            <span id="vendas_filtro_label"></span>
+                        </small>
+                        <span class="badge bg-primary" id="vendas_badge">0</span>
                     </div>
 
                     <div id="listaVendas">
@@ -653,9 +835,17 @@ $em_andamento = $stmt_andamento->fetchAll();
     let paginaAtual = 1;
     let totalPaginas = 1;
     let vendasCarregadas = [];
+    let buscaVendasTexto = '';
 
     $(document).ready(function() {
         carregarVendas();
+
+        // Busca vendas com Enter
+        $('#buscaVendas').on('keypress', function(e) {
+            if (e.which === 13) {
+                buscarVendas();
+            }
+        });
 
         // Pesquisa global
         let searchTimeout;
@@ -723,6 +913,25 @@ $em_andamento = $stmt_andamento->fetchAll();
         carregarVendas();
     }
 
+    function buscarVendas() {
+        buscaVendasTexto = $('#buscaVendas').val().trim();
+        paginaAtual = 1;
+        vendasCarregadas = [];
+        if (buscaVendasTexto) {
+            $('#btnLimparBuscaVendas').show();
+        }
+        carregarVendas();
+    }
+
+    function limparBuscaVendas() {
+        buscaVendasTexto = '';
+        $('#buscaVendas').val('');
+        $('#btnLimparBuscaVendas').hide();
+        paginaAtual = 1;
+        vendasCarregadas = [];
+        carregarVendas();
+    }
+
     function carregarVendas(append = false) {
         if (!append) {
             $('#listaVendas').html(`
@@ -743,15 +952,26 @@ $em_andamento = $stmt_andamento->fetchAll();
                 data_fim: dataFim,
                 status: filtroStatusVendas,
                 pagina: paginaAtual,
-                por_pagina: 50
+                por_pagina: 50,
+                busca: buscaVendasTexto
             },
             success: function(response) {
                 if (response.success) {
                     totalPaginas = response.total_paginas || 1;
 
+                    // Labels para filtro
+                    const filtroLabels = {
+                        'abertos': 'abertos',
+                        'concluidos': 'concluídos',
+                        'todos': 'títulos'
+                    };
+                    const filtroLabel = filtroLabels[filtroStatusVendas] || 'títulos';
+
                     // Atualizar contadores
                     $('#vendas_count').text(Math.min(paginaAtual * 50, response.total));
                     $('#vendas_total').text(response.total);
+                    $('#vendas_filtro_label').text(filtroLabel);
+                    $('#vendas_badge').text(response.total + ' ' + filtroLabel);
                     $('#vendas_info').css('display', 'flex');
 
                     // Atualizar paginação

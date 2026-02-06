@@ -230,7 +230,7 @@ $total_notificacoes = $notificacoes['vendas_pendentes'] + $notificacoes['retorno
                                 : $atend['nome_cliente'];
                         ?>
                         <li>
-                            <a class="dropdown-item notification-item py-2" href="<?= $nav_base ?>/titulo?id=<?= $atend['id'] ?>">
+                            <a class="dropdown-item notification-item py-2" href="<?= $nav_base ?>/titulo?id=<?= urlencode($atend['numero_titulo']) ?>">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="flex-grow-1">
                                         <div class="fw-bold text-truncate" style="max-width: 200px;">
