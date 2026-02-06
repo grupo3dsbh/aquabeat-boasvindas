@@ -119,26 +119,35 @@ try {
     foreach ($stmt_cfg->fetchAll() as $c) $configs[$c['chave']] = $c['valor'];
 } catch (Exception $e) {}
 
-// Buscar título anterior e próximo para navegação
+// Buscar título anterior e próximo para navegação (ordenado por numero_titulo)
 $titulo_anterior = null;
 $titulo_proximo = null;
 try {
-    // Próximo (ID maior, não concluído)
+    // Extrair número do título atual (ex: SFA-11132 -> 11132)
+    $numero_atual = preg_replace('/[^0-9]/', '', $titulo['numero_titulo']);
+
+    // Próximo (número maior, não concluído)
     $stmt_prox = $db->prepare("
         SELECT numero_titulo, status FROM boas_vindas
-        WHERE id > :id AND usuario_id = :user_id AND status != 'concluido'
-        ORDER BY id ASC LIMIT 1
+        WHERE usuario_id = :user_id
+        AND status != 'concluido'
+        AND CAST(REGEXP_REPLACE(numero_titulo, '[^0-9]', '') AS UNSIGNED) > :numero_atual
+        ORDER BY CAST(REGEXP_REPLACE(numero_titulo, '[^0-9]', '') AS UNSIGNED) ASC
+        LIMIT 1
     ");
-    $stmt_prox->execute([':id' => $titulo['id'], ':user_id' => Auth::getUserId()]);
+    $stmt_prox->execute([':user_id' => Auth::getUserId(), ':numero_atual' => $numero_atual]);
     $titulo_proximo = $stmt_prox->fetch();
 
-    // Anterior (ID menor, não concluído)
+    // Anterior (número menor, não concluído)
     $stmt_ant = $db->prepare("
         SELECT numero_titulo, status FROM boas_vindas
-        WHERE id < :id AND usuario_id = :user_id AND status != 'concluido'
-        ORDER BY id DESC LIMIT 1
+        WHERE usuario_id = :user_id
+        AND status != 'concluido'
+        AND CAST(REGEXP_REPLACE(numero_titulo, '[^0-9]', '') AS UNSIGNED) < :numero_atual
+        ORDER BY CAST(REGEXP_REPLACE(numero_titulo, '[^0-9]', '') AS UNSIGNED) DESC
+        LIMIT 1
     ");
-    $stmt_ant->execute([':id' => $titulo['id'], ':user_id' => Auth::getUserId()]);
+    $stmt_ant->execute([':user_id' => Auth::getUserId(), ':numero_atual' => $numero_atual]);
     $titulo_anterior = $stmt_ant->fetch();
 } catch (Exception $e) {}
 
@@ -500,12 +509,27 @@ function isValidScript($script) {
                                     </div>
                                 </div>
                             </div>
-                            <?php if ($nota_consultor > 0): ?>
-                            <div class="text-center mt-1" style="font-size: 11px;">
-                                Nota Consultor:
-                                <?php for ($i = 1; $i <= 5; $i++): ?>
-                                <i class="bi bi-star-fill <?= $i <= $nota_consultor ? 'text-warning' : 'text-muted' ?>" style="font-size: 12px;"></i>
-                                <?php endfor; ?>
+                            <?php
+                            $nota_atend_bv = $titulo['nota_atendimento_bv'] ?? 0;
+                            if ($nota_consultor > 0 || $nota_atend_bv > 0):
+                            ?>
+                            <div class="d-flex justify-content-around mt-1" style="font-size: 10px;">
+                                <?php if ($nota_consultor > 0): ?>
+                                <div class="text-center">
+                                    <small class="text-muted">Consultor:</small>
+                                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                                    <i class="bi bi-star-fill <?= $i <= $nota_consultor ? 'text-warning' : 'text-muted' ?>" style="font-size: 11px;"></i>
+                                    <?php endfor; ?>
+                                </div>
+                                <?php endif; ?>
+                                <?php if ($nota_atend_bv > 0): ?>
+                                <div class="text-center">
+                                    <small class="text-muted">Atendimento:</small>
+                                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                                    <i class="bi bi-star-fill <?= $i <= $nota_atend_bv ? 'text-info' : 'text-muted' ?>" style="font-size: 11px;"></i>
+                                    <?php endfor; ?>
+                                </div>
+                                <?php endif; ?>
                             </div>
                             <?php endif; ?>
                         </div>
@@ -724,8 +748,13 @@ function isValidScript($script) {
                                     <span class="saved-indicator" id="saved_<?= $etapa['codigo'] ?>"><i class="bi bi-check"></i></span>
                                 </div>
 
+                                <?php
+                                // Só mostrar radios de resposta para itens checkbox-only (não para campos de texto/numero/data)
+                                $mostrar_radios = empty($etapa['tipo_campo']) || $etapa['tipo_campo'] === 'checkbox';
+                                if ($mostrar_radios):
+                                ?>
                                 <!-- Response Radio: Positivo/Neutro/Negativo -->
-                                <div class="response-radio-inline">
+                                <div class="response-radio-inline" data-codigo="<?= $etapa['codigo'] ?>" data-resposta-atual="<?= htmlspecialchars($resposta_item) ?>">
                                     <div class="form-check">
                                         <input class="form-check-input response-radio" type="radio"
                                                name="resp_<?= $etapa['codigo'] ?>" id="resp_pos_<?= $etapa['codigo'] ?>"
@@ -754,6 +783,7 @@ function isValidScript($script) {
                                         </label>
                                     </div>
                                 </div>
+                                <?php endif; ?>
 
                                 <?php if ($etapa['descricao']): ?>
                                 <div class="item-description"><?= htmlspecialchars($etapa['descricao']) ?></div>
@@ -797,7 +827,7 @@ function isValidScript($script) {
                                 </div>
                                 <?php elseif ($etapa['tipo_campo'] === 'numero'): ?>
                                 <div class="field-input">
-                                    <input type="number" class="form-control form-control-sm checklist-numero" data-codigo="<?= $etapa['codigo'] ?>" value="<?= htmlspecialchars($val_num) ?>" placeholder="0">
+                                    <input type="number" min="0" class="form-control form-control-sm checklist-numero" data-codigo="<?= $etapa['codigo'] ?>" value="<?= htmlspecialchars($val_num) ?>" placeholder="0">
                                 </div>
                                 <?php elseif ($etapa['tipo_campo'] === 'rating'): ?>
                                 <div class="rating-stars" data-codigo="<?= $etapa['codigo'] ?>">
@@ -844,7 +874,9 @@ function isValidScript($script) {
                                 <label class="form-label small mb-1">Resultado</label>
                                 <select class="form-select form-select-sm" id="resultado_tentativa">
                                     <option value="atendeu">Atendeu</option>
+                                    <option value="so_chamou">Só chamou</option>
                                     <option value="nao_atendeu">Não atendeu</option>
+                                    <option value="desligou">Desligou</option>
                                     <option value="caixa_postal">Caixa postal</option>
                                 </select>
                             </div>
@@ -906,8 +938,13 @@ function isValidScript($script) {
                                 <span class="saved-indicator" id="saved_<?= $etapa['codigo'] ?>"><i class="bi bi-check"></i></span>
                             </div>
 
+                            <?php
+                            // Só mostrar radios para itens checkbox-only
+                            $mostrar_radios_reg = empty($etapa['tipo_campo']) || $etapa['tipo_campo'] === 'checkbox';
+                            if ($mostrar_radios_reg):
+                            ?>
                             <!-- Response Radio para registro -->
-                            <div class="response-radio-inline" style="margin-left: 18px;">
+                            <div class="response-radio-inline" style="margin-left: 18px;" data-codigo="<?= $etapa['codigo'] ?>" data-resposta-atual="<?= htmlspecialchars($resposta_reg) ?>">
                                 <div class="form-check">
                                     <input class="form-check-input response-radio" type="radio" name="resp_<?= $etapa['codigo'] ?>" value="Positivo" data-codigo="<?= $etapa['codigo'] ?>" <?= $resposta_reg === 'Positivo' ? 'checked' : '' ?>>
                                     <label class="form-check-label text-success"><i class="bi bi-emoji-smile"></i></label>
@@ -921,6 +958,7 @@ function isValidScript($script) {
                                     <label class="form-check-label text-danger"><i class="bi bi-emoji-frown"></i></label>
                                 </div>
                             </div>
+                            <?php endif; ?>
 
                             <?php if ($etapa['tipo_campo'] === 'select' && isset($opcoes['opcoes'])): ?>
                                 <?php $opts = $opcoes['opcoes']; $binary_keywords = ['Sim', 'Não', 'Positivo', 'Negativo', 'Neutro']; $is_binary = count($opts) <= 4 && count(array_intersect($opts, $binary_keywords)) > 0; ?>
@@ -952,7 +990,7 @@ function isValidScript($script) {
                             </div>
                             <?php elseif ($etapa['tipo_campo'] === 'numero'): ?>
                             <div class="field-input" style="margin-left: 18px;">
-                                <input type="number" class="form-control form-control-sm checklist-numero" data-codigo="<?= $etapa['codigo'] ?>" value="<?= htmlspecialchars($val_num) ?>" placeholder="0" style="font-size: 11px;">
+                                <input type="number" min="0" class="form-control form-control-sm checklist-numero" data-codigo="<?= $etapa['codigo'] ?>" value="<?= htmlspecialchars($val_num) ?>" placeholder="0" style="font-size: 11px;">
                             </div>
                             <?php elseif ($etapa['tipo_campo'] === 'rating'): ?>
                             <div class="rating-stars" data-codigo="<?= $etapa['codigo'] ?>" style="margin-left: 18px;">
@@ -1360,18 +1398,27 @@ function isValidScript($script) {
         });
     }
 
-    // Atualizar satisfação dinamicamente
-    function atualizarSatisfacao(valorTexto) {
+    // Atualizar satisfação dinamicamente (com suporte a trocar resposta)
+    function atualizarSatisfacao(novoValor, valorAnterior = null) {
         const positivas = ['Positivo', 'Sim', 'Sim, confirmado', 'Sim, correto'];
         const negativas = ['Negativo', 'Não', 'Dados incorretos', 'Não, corrigido'];
+        const neutras = ['Neutro'];
 
         let pos = parseInt(document.querySelector('.metric-value.text-success')?.textContent || 0);
         let neg = parseInt(document.querySelector('.metric-value.text-danger')?.textContent || 0);
         let neu = parseInt(document.querySelector('.metric-value.text-warning')?.textContent || 0);
 
-        if (positivas.includes(valorTexto)) pos++;
-        else if (negativas.includes(valorTexto)) neg++;
-        else if (valorTexto === 'Neutro') neu++;
+        // Subtrair valor anterior se houver
+        if (valorAnterior) {
+            if (positivas.includes(valorAnterior) || valorAnterior === 'Positivo') pos = Math.max(0, pos - 1);
+            else if (negativas.includes(valorAnterior) || valorAnterior === 'Negativo') neg = Math.max(0, neg - 1);
+            else if (neutras.includes(valorAnterior) || valorAnterior === 'Neutro') neu = Math.max(0, neu - 1);
+        }
+
+        // Adicionar novo valor
+        if (positivas.includes(novoValor) || novoValor === 'Positivo') pos++;
+        else if (negativas.includes(novoValor) || novoValor === 'Negativo') neg++;
+        else if (neutras.includes(novoValor) || novoValor === 'Neutro') neu++;
 
         const total = pos + neg + neu;
         const score = total > 0 ? Math.round((pos / total) * 100) : 0;
@@ -1440,17 +1487,26 @@ function isValidScript($script) {
     document.querySelectorAll('.response-radio').forEach(radio => {
         radio.addEventListener('change', function() {
             const codigo = this.dataset.codigo;
-            const valor = this.value;
+            const novoValor = this.value;
+
+            // Obter o valor anterior do container (armazenado em data-resposta-atual)
+            const container = this.closest('.response-radio-inline');
+            const valorAnterior = container?.dataset.respostaAtual || null;
+
+            // Atualizar o valor armazenado
+            if (container) container.dataset.respostaAtual = novoValor;
+
             // Marcar checkbox automaticamente
             const cb = document.getElementById('check_' + codigo);
             if (cb && !cb.checked) {
                 cb.checked = true;
-                salvarInteracao(codigo, 1, valor, null);
+                salvarInteracao(codigo, 1, novoValor, null);
             } else {
-                salvarInteracao(codigo, null, valor, null);
+                salvarInteracao(codigo, null, novoValor, null);
             }
-            // Atualizar satisfação
-            atualizarSatisfacao(valor);
+
+            // Atualizar satisfação (passando valor anterior para subtrair)
+            atualizarSatisfacao(novoValor, valorAnterior);
         });
     });
 
@@ -1469,8 +1525,30 @@ function isValidScript($script) {
         salvarFeedbackBV();
     });
 
+    // Armazenar classificação anterior para atualização de satisfação
+    let classifAnterior = document.querySelector('.classif-bv-radio:checked')?.value || '';
+
     document.querySelectorAll('.classif-bv-radio').forEach(radio => {
         radio.addEventListener('change', function() {
+            const novaClassif = this.value;
+
+            // Mapear classificação para satisfação
+            const mapClassif = {
+                'Excelente': 'Positivo',
+                'Bom': 'Positivo',
+                'Regular': 'Neutro',
+                'Difícil': 'Negativo'
+            };
+
+            const valorAnterior = mapClassif[classifAnterior] || null;
+            const novoValor = mapClassif[novaClassif] || null;
+
+            // Atualizar satisfação
+            if (novoValor) {
+                atualizarSatisfacao(novoValor, valorAnterior);
+            }
+
+            classifAnterior = novaClassif;
             salvarFeedbackBV();
         });
     });
