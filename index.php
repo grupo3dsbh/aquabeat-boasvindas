@@ -23,13 +23,12 @@ try {
         if ($cfg['chave'] === 'filtro_data_padrao' && $cfg['valor']) $filtro_padrao = $cfg['valor'];
         if ($cfg['chave'] === 'mostrar_selector_periodo') $mostrar_selector = $cfg['valor'] == '1';
     }
-} catch (Exception $e) {
-    // Configs não existem ainda
-}
+} catch (Exception $e) {}
 
-// Permitir override do filtro via GET
+// Filtros ativos
 $filtro_atual = $_GET['periodo'] ?? ($_GET['filtro'] ?? $filtro_padrao);
-$filtro_notificacao = $_GET['filtro'] ?? null;
+$filtro_status_atend = $_GET['status_atend'] ?? 'abertos'; // abertos, concluidos, todos
+$filtro_status_vendas = $_GET['status_vendas'] ?? 'abertos'; // abertos, concluidos, todos
 
 // Calcular datas baseado no filtro
 $data_inicio = date('Y-m-01');
@@ -65,7 +64,8 @@ $stmt_stats = $db_bv->prepare("
     SELECT
         COUNT(*) as total,
         SUM(CASE WHEN status = 'concluido' THEN 1 ELSE 0 END) as concluidos,
-        SUM(CASE WHEN status = 'em_andamento' THEN 1 ELSE 0 END) as em_andamento
+        SUM(CASE WHEN status = 'em_andamento' THEN 1 ELSE 0 END) as em_andamento,
+        SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendentes
     FROM boas_vindas
     WHERE usuario_id = :usuario_id
 ");
@@ -87,14 +87,21 @@ if (Auth::isAdmin()) {
     $stats_geral = $stmt_geral->fetch();
 }
 
-// Boas-vindas em andamento do usuario
-$where_extra = '';
-if ($filtro_notificacao === 'pendentes') {
-    $where_extra = " AND DATEDIFF(NOW(), bv.data_venda) > 1 AND bv.status = 'pendente'";
-} elseif ($filtro_notificacao === 'retornos') {
-    $where_extra = " AND bv.resultado_ultimo_contato = 'nao_atendeu'";
-} elseif ($filtro_notificacao === 'agendados') {
-    $where_extra = " AND DATE(bv.proxima_tentativa) = CURDATE()";
+// Filtro de status para atendimentos
+$status_condition = '';
+switch ($filtro_status_atend) {
+    case 'abertos':
+        $status_condition = "AND bv.status IN ('pendente', 'em_andamento')";
+        break;
+    case 'concluidos':
+        $status_condition = "AND bv.status = 'concluido'";
+        break;
+    case 'pendentes':
+        $status_condition = "AND bv.status = 'pendente'";
+        break;
+    case 'em_andamento':
+        $status_condition = "AND bv.status = 'em_andamento'";
+        break;
 }
 
 $stmt_andamento = $db_bv->prepare("
@@ -102,12 +109,13 @@ $stmt_andamento = $db_bv->prepare("
     FROM boas_vindas bv
     LEFT JOIN usuarios u ON bv.usuario_id = u.id
     WHERE (bv.usuario_id = :usuario_id OR :is_admin = 1)
-    AND bv.status IN ('pendente', 'em_andamento')
-    $where_extra
+    $status_condition
     ORDER BY
-        CASE WHEN bv.status = 'em_andamento' THEN 0 ELSE 1 END,
-        bv.data_venda ASC
-    LIMIT 20
+        CASE WHEN bv.status = 'em_andamento' THEN 0
+             WHEN bv.status = 'pendente' THEN 1
+             ELSE 2 END,
+        bv.data_venda DESC
+    LIMIT 30
 ");
 $stmt_andamento->execute([
     ':usuario_id' => $usuario_id,
@@ -167,36 +175,81 @@ $em_andamento = $stmt_andamento->fetchAll();
         .venda-card.pendente { border-left: 4px solid #6c757d; }
         .venda-card.urgente { border-left: 4px solid #dc3545; background: #fff8f8; }
         .badge-status { font-size: 0.75rem; padding: 5px 10px; }
-        .filter-bar {
-            background: white;
-            border-radius: 10px;
-            padding: 15px 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .filter-btn {
+        .dias-badge { font-size: 10px; padding: 2px 6px; }
+        .filter-tabs { display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
+        .filter-tab {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             border: 1px solid #dee2e6;
             background: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 13px;
+            color: #6c757d;
+            cursor: pointer;
+            text-decoration: none;
             transition: all 0.2s;
         }
-        .filter-btn:hover, .filter-btn.active {
+        .filter-tab:hover, .filter-tab.active {
             background: #1e3c72;
             color: white;
             border-color: #1e3c72;
         }
-        .dias-badge {
-            font-size: 10px;
-            padding: 2px 6px;
+        .search-global {
+            position: relative;
+            margin-bottom: 20px;
         }
+        .search-global input {
+            padding-left: 40px;
+            border-radius: 25px;
+        }
+        .search-global i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        .search-results.show { display: block; }
+        .search-result-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .search-result-item:hover { background: #f8f9fa; }
+        .search-result-item:last-child { border-bottom: none; }
     </style>
 </head>
 <body>
     <?php include 'includes/navbar.php'; ?>
 
     <div class="container-fluid mt-4">
+        <!-- Pesquisa Global -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="search-global">
+                    <i class="bi bi-search"></i>
+                    <input type="text" class="form-control form-control-lg" id="searchGlobal" placeholder="Pesquisar por CPF, ID do Título ou Nome do Cliente...">
+                    <div class="search-results" id="searchResults"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Cards de Estatisticas -->
         <div class="row mb-4">
             <div class="col-md-4">
@@ -248,47 +301,42 @@ $em_andamento = $stmt_andamento->fetchAll();
         </div>
         <?php endif; ?>
 
-        <?php if ($filtro_notificacao): ?>
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="alert alert-warning d-flex justify-content-between align-items-center mb-0">
-                    <span>
-                        <i class="bi bi-funnel"></i>
-                        <strong>Filtro ativo:</strong>
-                        <?php
-                        switch($filtro_notificacao) {
-                            case 'pendentes': echo 'Vendas pendentes há mais de 1 dia'; break;
-                            case 'retornos': echo 'Clientes que não atenderam'; break;
-                            case 'agendados': echo 'Retornos agendados para hoje'; break;
-                        }
-                        ?>
-                    </span>
-                    <a href="index" class="btn btn-sm btn-outline-warning">
-                        <i class="bi bi-x-lg"></i> Limpar Filtro
-                    </a>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <div class="row">
-            <!-- Boas-vindas em andamento -->
+            <!-- Meus Atendimentos -->
             <div class="col-lg-6">
                 <div class="content-section">
-                    <h5 class="mb-4">
-                        <i class="bi bi-hourglass-split text-warning"></i>
-                        Meus Atendimentos
-                        <?php if ($filtro_notificacao): ?>
-                        <span class="badge bg-warning"><?= count($em_andamento) ?></span>
-                        <?php endif; ?>
-                    </h5>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="bi bi-hourglass-split text-warning"></i>
+                            Meus Atendimentos
+                        </h5>
+                    </div>
+
+                    <!-- Filtros de Status -->
+                    <div class="filter-tabs">
+                        <a href="?status_atend=abertos&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'abertos' ? 'active' : '' ?>">
+                            <i class="bi bi-folder2-open"></i> Abertos
+                        </a>
+                        <a href="?status_atend=pendentes&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'pendentes' ? 'active' : '' ?>">
+                            <i class="bi bi-clock"></i> Pendentes
+                        </a>
+                        <a href="?status_atend=em_andamento&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'em_andamento' ? 'active' : '' ?>">
+                            <i class="bi bi-play-circle"></i> Em Andamento
+                        </a>
+                        <a href="?status_atend=concluidos&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'concluidos' ? 'active' : '' ?>">
+                            <i class="bi bi-check-circle"></i> Concluídos
+                        </a>
+                        <a href="?status_atend=todos&periodo=<?= $filtro_atual ?>&status_vendas=<?= $filtro_status_vendas ?>" class="filter-tab <?= $filtro_status_atend === 'todos' ? 'active' : '' ?>">
+                            <i class="bi bi-list"></i> Todos
+                        </a>
+                    </div>
 
                     <?php if (count($em_andamento) > 0): ?>
                         <?php foreach ($em_andamento as $bv):
                             $dias_desde_venda = diasDesdeVenda($bv['data_venda']);
                             $urgente = $bv['status'] === 'pendente' && $dias_desde_venda > 1;
                         ?>
-                        <a href="titulo?id=<?= htmlspecialchars($bv['numero_titulo']) ?>" class="venda-card <?= $urgente ? 'urgente' : ($bv['status'] === 'em_andamento' ? 'em-andamento' : 'pendente') ?>">
+                        <a href="titulo?id=<?= htmlspecialchars($bv['numero_titulo']) ?>" class="venda-card <?= $bv['status'] === 'concluido' ? 'concluido' : ($urgente ? 'urgente' : ($bv['status'] === 'em_andamento' ? 'em-andamento' : 'pendente')) ?>">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <h6 class="mb-1"><?= htmlspecialchars($bv['nome_cliente']) ?></h6>
@@ -298,7 +346,9 @@ $em_andamento = $stmt_andamento->fetchAll();
                                     </small>
                                 </div>
                                 <div class="text-end">
-                                    <?php if ($urgente): ?>
+                                    <?php if ($bv['status'] === 'concluido'): ?>
+                                    <span class="badge bg-success badge-status">Concluído</span>
+                                    <?php elseif ($urgente): ?>
                                     <span class="badge bg-danger badge-status">Urgente</span>
                                     <?php elseif ($bv['status'] === 'em_andamento'): ?>
                                     <span class="badge bg-warning badge-status">Em Andamento</span>
@@ -324,7 +374,7 @@ $em_andamento = $stmt_andamento->fetchAll();
                     <?php else: ?>
                         <div class="text-center text-muted py-4">
                             <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-                            <p class="mt-2">Nenhum atendimento em andamento</p>
+                            <p class="mt-2">Nenhum atendimento encontrado</p>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -333,7 +383,7 @@ $em_andamento = $stmt_andamento->fetchAll();
             <!-- Vendas do Periodo -->
             <div class="col-lg-6">
                 <div class="content-section">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0">
                             <i class="bi bi-cart-check text-primary"></i>
                             Vendas - <?= $filtro_label ?>
@@ -344,10 +394,10 @@ $em_andamento = $stmt_andamento->fetchAll();
                                 <i class="bi bi-calendar3"></i> Período
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item <?= $filtro_atual === 'mes_atual' ? 'active' : '' ?>" href="?periodo=mes_atual">Mês Atual</a></li>
-                                <li><a class="dropdown-item <?= $filtro_atual === 'mes_anterior' ? 'active' : '' ?>" href="?periodo=mes_anterior">Mês Anterior</a></li>
-                                <li><a class="dropdown-item <?= $filtro_atual === 'ultimos_30_dias' ? 'active' : '' ?>" href="?periodo=ultimos_30_dias">Últimos 30 dias</a></li>
-                                <li><a class="dropdown-item <?= $filtro_atual === 'ultimos_60_dias' ? 'active' : '' ?>" href="?periodo=ultimos_60_dias">Últimos 60 dias</a></li>
+                                <li><a class="dropdown-item <?= $filtro_atual === 'mes_atual' ? 'active' : '' ?>" href="?periodo=mes_atual&status_atend=<?= $filtro_status_atend ?>&status_vendas=<?= $filtro_status_vendas ?>">Mês Atual</a></li>
+                                <li><a class="dropdown-item <?= $filtro_atual === 'mes_anterior' ? 'active' : '' ?>" href="?periodo=mes_anterior&status_atend=<?= $filtro_status_atend ?>&status_vendas=<?= $filtro_status_vendas ?>">Mês Anterior</a></li>
+                                <li><a class="dropdown-item <?= $filtro_atual === 'ultimos_30_dias' ? 'active' : '' ?>" href="?periodo=ultimos_30_dias&status_atend=<?= $filtro_status_atend ?>&status_vendas=<?= $filtro_status_vendas ?>">Últimos 30 dias</a></li>
+                                <li><a class="dropdown-item <?= $filtro_atual === 'ultimos_60_dias' ? 'active' : '' ?>" href="?periodo=ultimos_60_dias&status_atend=<?= $filtro_status_atend ?>&status_vendas=<?= $filtro_status_vendas ?>">Últimos 60 dias</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#modalPeriodo">
@@ -357,6 +407,19 @@ $em_andamento = $stmt_andamento->fetchAll();
                             </ul>
                         </div>
                         <?php endif; ?>
+                    </div>
+
+                    <!-- Filtros de Status Vendas -->
+                    <div class="filter-tabs">
+                        <a href="?status_vendas=abertos&periodo=<?= $filtro_atual ?>&status_atend=<?= $filtro_status_atend ?>" class="filter-tab <?= $filtro_status_vendas === 'abertos' ? 'active' : '' ?>" onclick="filtrarVendas('abertos'); return false;">
+                            <i class="bi bi-folder2-open"></i> Abertos
+                        </a>
+                        <a href="?status_vendas=concluidos&periodo=<?= $filtro_atual ?>&status_atend=<?= $filtro_status_atend ?>" class="filter-tab <?= $filtro_status_vendas === 'concluidos' ? 'active' : '' ?>" onclick="filtrarVendas('concluidos'); return false;">
+                            <i class="bi bi-check-circle"></i> Concluídos
+                        </a>
+                        <a href="?status_vendas=todos&periodo=<?= $filtro_atual ?>&status_atend=<?= $filtro_status_atend ?>" class="filter-tab <?= $filtro_status_vendas === 'todos' ? 'active' : '' ?>" onclick="filtrarVendas('todos'); return false;">
+                            <i class="bi bi-list"></i> Todos
+                        </a>
                     </div>
 
                     <div id="listaVendas">
@@ -382,6 +445,8 @@ $em_andamento = $stmt_andamento->fetchAll();
                 </div>
                 <form method="GET">
                     <input type="hidden" name="periodo" value="personalizado">
+                    <input type="hidden" name="status_atend" value="<?= $filtro_status_atend ?>">
+                    <input type="hidden" name="status_vendas" value="<?= $filtro_status_vendas ?>">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">Data Início</label>
@@ -390,12 +455,6 @@ $em_andamento = $stmt_andamento->fetchAll();
                         <div class="mb-3">
                             <label class="form-label">Data Fim</label>
                             <input type="date" class="form-control" name="data_fim" value="<?= $data_fim ?>" required>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="salvarPadrao" name="salvar_padrao">
-                            <label class="form-check-label" for="salvarPadrao">
-                                Salvar como período padrão
-                            </label>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -413,18 +472,90 @@ $em_andamento = $stmt_andamento->fetchAll();
     <script>
     const dataInicio = '<?= $data_inicio ?>';
     const dataFim = '<?= $data_fim ?>';
+    let filtroStatusVendas = '<?= $filtro_status_vendas ?>';
 
     $(document).ready(function() {
         carregarVendas();
+
+        // Pesquisa global
+        let searchTimeout;
+        $('#searchGlobal').on('input', function() {
+            clearTimeout(searchTimeout);
+            const query = $(this).val().trim();
+
+            if (query.length < 2) {
+                $('#searchResults').removeClass('show').empty();
+                return;
+            }
+
+            searchTimeout = setTimeout(function() {
+                pesquisarGlobal(query);
+            }, 300);
+        });
+
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.search-global').length) {
+                $('#searchResults').removeClass('show');
+            }
+        });
     });
 
+    function pesquisarGlobal(query) {
+        $.ajax({
+            url: 'api_pesquisa.php',
+            method: 'GET',
+            data: { q: query },
+            success: function(response) {
+                const results = $('#searchResults');
+                results.empty();
+
+                if (response.success && response.data.length > 0) {
+                    response.data.forEach(function(item) {
+                        results.append(`
+                            <a href="titulo?id=${escapeHtml(item.numero_titulo)}" class="search-result-item">
+                                <div class="d-flex justify-content-between">
+                                    <strong>${escapeHtml(item.nome_cliente)}</strong>
+                                    <span class="badge bg-${item.status === 'concluido' ? 'success' : (item.status === 'em_andamento' ? 'warning' : 'secondary')}">${item.status}</span>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="bi bi-card-text"></i> ${escapeHtml(item.numero_titulo)} |
+                                    <i class="bi bi-person-vcard"></i> ${escapeHtml(item.documento_cliente || '-')}
+                                </small>
+                            </a>
+                        `);
+                    });
+                    results.addClass('show');
+                } else {
+                    results.html('<div class="text-center text-muted p-3">Nenhum resultado encontrado</div>');
+                    results.addClass('show');
+                }
+            }
+        });
+    }
+
+    function filtrarVendas(status) {
+        filtroStatusVendas = status;
+        // Update active class
+        $('.filter-tabs a[onclick*="filtrarVendas"]').removeClass('active');
+        $(`.filter-tabs a[onclick*="filtrarVendas('${status}')"]`).addClass('active');
+        carregarVendas();
+    }
+
     function carregarVendas() {
+        $('#listaVendas').html(`
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Carregando vendas...</p>
+            </div>
+        `);
+
         $.ajax({
             url: 'api_vendas.php',
             method: 'GET',
             data: {
                 data_inicio: dataInicio,
-                data_fim: dataFim
+                data_fim: dataFim,
+                status: filtroStatusVendas
             },
             success: function(response) {
                 if (response.success) {
@@ -452,7 +583,7 @@ $em_andamento = $stmt_andamento->fetchAll();
             lista.html(`
                 <div class="text-center text-muted py-4">
                     <i class="bi bi-calendar-x" style="font-size: 3rem;"></i>
-                    <p class="mt-2">Nenhuma venda encontrada neste período</p>
+                    <p class="mt-2">Nenhuma venda encontrada</p>
                 </div>
             `);
             return;
@@ -470,7 +601,6 @@ $em_andamento = $stmt_andamento->fetchAll();
                 statusBadge = '<span class="badge bg-warning badge-status">Em Andamento</span>';
             }
 
-            // Calcular dias desde venda
             let diasVenda = '';
             if (venda.data_venda) {
                 const dataVenda = new Date(venda.data_venda);

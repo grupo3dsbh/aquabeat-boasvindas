@@ -119,6 +119,34 @@ try {
     foreach ($stmt_cfg->fetchAll() as $c) $configs[$c['chave']] = $c['valor'];
 } catch (Exception $e) {}
 
+// Mapeamento de nomes amigáveis para atividades
+$nomes_amigaveis = [
+    'checkbox_marcado' => 'Item marcado',
+    'checkbox_desmarcado' => 'Item desmarcado',
+    'texto_salvo' => 'Texto salvo',
+    'numero_salvo' => 'Número salvo',
+    'observacao_salva' => 'Observação salva',
+    'atend_nota_consultor' => 'Nota do consultor',
+    'atend_feedback_texto' => 'Feedback registrado',
+    'atend_feedback_positivo' => 'Avaliação do feedback',
+    'prep_verificar_dados' => 'Verificou dados',
+    'prep_verificar_consultor' => 'Verificou consultor',
+    'abert_cumprimentar' => 'Cumprimentou cliente',
+    'valid_confirmar_cpf' => 'Confirmou CPF',
+    'portal_informar' => 'Informou portal',
+    'financ_explicou_anuidade' => 'Explicou anuidade',
+    'observacoes_gerais' => 'Observação geral'
+];
+
+function getNomeAmigavel($codigo, $tipo_log, $nomes) {
+    if (isset($nomes[$codigo])) return $nomes[$codigo];
+    if (isset($nomes[$tipo_log])) return $nomes[$tipo_log];
+    // Tentar fazer replace básico
+    $nome = str_replace('_', ' ', $codigo ?? $tipo_log);
+    $nome = ucfirst($nome);
+    return $nome;
+}
+
 // Calcular progresso e métricas de satisfação
 $total_obrig = 0; $completos_obrig = 0;
 $satisfacao_positiva = 0; $satisfacao_negativa = 0; $satisfacao_neutra = 0;
@@ -307,7 +335,10 @@ function isValidScript($script) {
                 </a>
                 <h5 class="mb-0 mt-1" style="font-size: 16px;">
                     <i class="bi bi-ticket-perforated"></i>
-                    Título: <strong><?= htmlspecialchars($titulo['numero_titulo']) ?></strong>
+                    Título: <strong id="tituloId"><?= htmlspecialchars($titulo['numero_titulo']) ?></strong>
+                    <button class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" onclick="copiarTexto('<?= htmlspecialchars($titulo['numero_titulo']) ?>')" title="Copiar ID">
+                        <i class="bi bi-clipboard" style="font-size: 12px;"></i>
+                    </button>
                 </h5>
             </div>
             <div class="d-flex gap-2">
@@ -400,12 +431,22 @@ function isValidScript($script) {
                         <div class="info-item">
                             <div class="info-label">Telefone</div>
                             <div class="info-value">
+                                <?php if (!empty($titulo['telefone'])): ?>
                                 <a href="tel:<?= preg_replace('/[^0-9]/', '', $titulo['telefone'] ?? '') ?>" class="text-decoration-none">
                                     <?= formatarTelefone($titulo['telefone']) ?>
                                 </a>
-                                <button class="btn btn-sm btn-outline-success py-0 px-1 ms-1" onclick="copiarTexto('<?= preg_replace('/[^0-9]/', '', $titulo['telefone'] ?? '') ?>')">
+                                <button class="btn btn-sm btn-outline-success py-0 px-1 ms-1" onclick="copiarTexto('<?= preg_replace('/[^0-9]/', '', $titulo['telefone'] ?? '') ?>')" title="Copiar">
                                     <i class="bi bi-clipboard" style="font-size: 10px;"></i>
                                 </button>
+                                <button class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" data-bs-toggle="modal" data-bs-target="#modalTelefone" title="Editar">
+                                    <i class="bi bi-pencil" style="font-size: 10px;"></i>
+                                </button>
+                                <?php else: ?>
+                                <span class="text-muted">-</span>
+                                <button class="btn btn-sm btn-warning py-0 px-2 ms-1" data-bs-toggle="modal" data-bs-target="#modalTelefone">
+                                    <i class="bi bi-plus"></i> Adicionar
+                                </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="info-item">
@@ -426,11 +467,27 @@ function isValidScript($script) {
                         </div>
                         <div class="info-item">
                             <div class="info-label">Pagamento</div>
-                            <div class="info-value"><?= htmlspecialchars($titulo['forma_pagamento'] ?? '-') ?></div>
+                            <div class="info-value">
+                                <?= htmlspecialchars($titulo['forma_pagamento'] ?? '-') ?>
+                                <?php if (!empty($titulo['pagamento_obs'])): ?>
+                                <span class="badge bg-info" style="font-size: 9px;"><?= htmlspecialchars($titulo['pagamento_obs']) ?></span>
+                                <?php endif; ?>
+                                <button class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" data-bs-toggle="modal" data-bs-target="#modalInfoExtra" onclick="abrirModalInfo('pagamento')" title="Adicionar info">
+                                    <i class="bi bi-plus-circle" style="font-size: 10px;"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">Consultor</div>
-                            <div class="info-value"><?= htmlspecialchars($titulo['promotor'] ?? '-') ?></div>
+                            <div class="info-value">
+                                <?= htmlspecialchars($titulo['promotor'] ?? '-') ?>
+                                <?php if (!empty($titulo['promotor_obs'])): ?>
+                                <span class="badge bg-info" style="font-size: 9px;"><?= htmlspecialchars($titulo['promotor_obs']) ?></span>
+                                <?php endif; ?>
+                                <button class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" data-bs-toggle="modal" data-bs-target="#modalInfoExtra" onclick="abrirModalInfo('consultor')" title="Adicionar info">
+                                    <i class="bi bi-plus-circle" style="font-size: 10px;"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -473,7 +530,7 @@ function isValidScript($script) {
                             <?php foreach ($logs as $log): ?>
                             <div class="log-item <?= $log['tipo_log'] ?>">
                                 <small class="text-muted"><?= formatarData($log['criado_em']) ?></small>
-                                - <?= htmlspecialchars($log['etapa_codigo'] ?? $log['tipo_log']) ?>
+                                - <?= htmlspecialchars(getNomeAmigavel($log['etapa_codigo'], $log['tipo_log'], $nomes_amigaveis)) ?>
                             </div>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -735,6 +792,55 @@ function isValidScript($script) {
         </div>
     </div>
 
+    <!-- Modal Telefone -->
+    <div class="modal fade" id="modalTelefone" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-telephone"></i> Telefone</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Telefone</label>
+                        <input type="text" class="form-control" id="input_telefone" value="<?= htmlspecialchars($titulo['telefone'] ?? '') ?>" placeholder="(00) 00000-0000">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="salvarTelefone()">
+                        <i class="bi bi-save"></i> Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Info Extra -->
+    <div class="modal fade" id="modalInfoExtra" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalInfoExtraTitulo"><i class="bi bi-info-circle"></i> Informação Extra</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="info_extra_tipo">
+                    <div class="mb-3">
+                        <label class="form-label" id="info_extra_label">Observação</label>
+                        <input type="text" class="form-control" id="info_extra_valor" placeholder="Ex: Pagou no PIX, Vendedor João...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="salvarInfoExtra()">
+                        <i class="bi bi-save"></i> Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div class="toast-container">
         <div class="toast" id="toast" role="alert">
@@ -870,6 +976,8 @@ function isValidScript($script) {
                 } else {
                     salvarInteracao(codigo, null, this.value, null);
                 }
+                // Atualizar satisfação dinamicamente
+                atualizarSatisfacao(this.value);
             } else {
                 salvarInteracao(codigo, null, this.value, null);
             }
@@ -886,6 +994,8 @@ function isValidScript($script) {
             } else {
                 salvarInteracao(codigo, null, this.value, null);
             }
+            // Atualizar satisfação dinamicamente
+            atualizarSatisfacao(this.value);
         });
     });
 
@@ -945,6 +1055,95 @@ function isValidScript($script) {
             success: () => { showToast('Concluído!'); setTimeout(() => location.reload(), 1000); },
             error: () => showToast('Erro', 'danger')
         });
+    }
+
+    // Salvar telefone
+    function salvarTelefone() {
+        const telefone = document.getElementById('input_telefone').value;
+        $.ajax({
+            url: baseUrl + '/api_salvar_boasvindas.php',
+            method: 'POST',
+            data: { id: boasVindasId, telefone: telefone },
+            success: function(response) {
+                if (response.success) {
+                    showToast('Telefone salvo!');
+                    bootstrap.Modal.getInstance(document.getElementById('modalTelefone')).hide();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showToast('Erro: ' + response.error, 'danger');
+                }
+            },
+            error: () => showToast('Erro ao salvar', 'danger')
+        });
+    }
+
+    // Modal info extra
+    function abrirModalInfo(tipo) {
+        document.getElementById('info_extra_tipo').value = tipo;
+        if (tipo === 'pagamento') {
+            document.getElementById('modalInfoExtraTitulo').innerHTML = '<i class="bi bi-credit-card"></i> Info Pagamento';
+            document.getElementById('info_extra_label').textContent = 'Observação sobre pagamento';
+            document.getElementById('info_extra_valor').placeholder = 'Ex: Pagou no PIX, Parcelou em 3x...';
+        } else {
+            document.getElementById('modalInfoExtraTitulo').innerHTML = '<i class="bi bi-person"></i> Info Consultor';
+            document.getElementById('info_extra_label').textContent = 'Observação sobre o consultor';
+            document.getElementById('info_extra_valor').placeholder = 'Ex: Vendedor real: João, Indicação...';
+        }
+    }
+
+    function salvarInfoExtra() {
+        const tipo = document.getElementById('info_extra_tipo').value;
+        const valor = document.getElementById('info_extra_valor').value;
+        const campo = tipo === 'pagamento' ? 'pagamento_obs' : 'promotor_obs';
+
+        $.ajax({
+            url: baseUrl + '/api_salvar_boasvindas.php',
+            method: 'POST',
+            data: { id: boasVindasId, [campo]: valor },
+            success: function(response) {
+                if (response.success) {
+                    showToast('Informação salva!');
+                    bootstrap.Modal.getInstance(document.getElementById('modalInfoExtra')).hide();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showToast('Erro: ' + response.error, 'danger');
+                }
+            },
+            error: () => showToast('Erro ao salvar', 'danger')
+        });
+    }
+
+    // Atualizar satisfação dinamicamente
+    function atualizarSatisfacao(valorTexto) {
+        const positivas = ['Positivo', 'Sim', 'Sim, confirmado', 'Sim, correto'];
+        const negativas = ['Negativo', 'Não', 'Dados incorretos', 'Não, corrigido'];
+
+        let pos = parseInt(document.querySelector('.metric-value.text-success')?.textContent || 0);
+        let neg = parseInt(document.querySelector('.metric-value.text-danger')?.textContent || 0);
+        let neu = parseInt(document.querySelector('.metric-value.text-warning')?.textContent || 0);
+
+        if (positivas.includes(valorTexto)) pos++;
+        else if (negativas.includes(valorTexto)) neg++;
+        else if (valorTexto === 'Neutro') neu++;
+
+        const total = pos + neg + neu;
+        const score = total > 0 ? Math.round((pos / total) * 100) : 0;
+
+        // Atualizar UI
+        const posEl = document.querySelector('.metric-value.text-success');
+        const negEl = document.querySelector('.metric-value.text-danger');
+        const neuEl = document.querySelector('.metric-value.text-warning');
+        const scoreEl = document.querySelector('.satisfaction-score');
+        const needleEl = document.querySelector('.satisfaction-needle');
+
+        if (posEl) posEl.textContent = pos;
+        if (negEl) negEl.textContent = neg;
+        if (neuEl) neuEl.textContent = neu;
+        if (scoreEl) {
+            scoreEl.textContent = score + '%';
+            scoreEl.className = 'satisfaction-score ' + (score >= 70 ? 'text-success' : (score >= 40 ? 'text-warning' : 'text-danger'));
+        }
+        if (needleEl) needleEl.style.transform = 'rotate(' + ((score - 50) * 1.8) + 'deg)';
     }
     </script>
 </body>

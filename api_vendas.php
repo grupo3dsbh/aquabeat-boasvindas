@@ -29,9 +29,10 @@ try {
         ], 404);
     }
 
-    // Buscar vendas - aceitar filtro de data via GET
+    // Buscar vendas - aceitar filtro de data e status via GET
     $data_inicio = $_GET['data_inicio'] ?? date('Y-m-01');
     $data_fim = $_GET['data_fim'] ?? date('Y-m-t');
+    $filtro_status = $_GET['status'] ?? 'abertos'; // abertos, concluidos, todos
 
     // Validar datas
     $primeiro_dia_mes = date('Y-m-d 00:00:00', strtotime($data_inicio));
@@ -118,6 +119,7 @@ try {
     $vendas = $stmt->fetchAll();
 
     // Para cada venda, verificar se já existe boas-vindas
+    $vendas_filtradas = [];
     foreach ($vendas as &$venda) {
         $numero = $venda['numero_titulo'] ?? null;
         if (!$numero) continue;
@@ -150,12 +152,27 @@ try {
             $venda['boas_vindas_concluido_em'] = null;
             $venda['atendente'] = null;
         }
+
+        // Filtrar por status
+        $status = $venda['boas_vindas_status'];
+        if ($filtro_status === 'abertos') {
+            if ($status !== 'concluido') {
+                $vendas_filtradas[] = $venda;
+            }
+        } elseif ($filtro_status === 'concluidos') {
+            if ($status === 'concluido') {
+                $vendas_filtradas[] = $venda;
+            }
+        } else {
+            // todos
+            $vendas_filtradas[] = $venda;
+        }
     }
 
     jsonResponse([
         'success' => true,
-        'data' => $vendas,
-        'total' => count($vendas),
+        'data' => $vendas_filtradas,
+        'total' => count($vendas_filtradas),
         'periodo' => [
             'inicio' => $primeiro_dia_mes,
             'fim' => $ultimo_dia_mes

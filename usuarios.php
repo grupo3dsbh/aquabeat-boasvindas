@@ -103,10 +103,15 @@ $usuarios = $stmt->fetchAll();
                             </div>
                         </div>
 
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 flex-wrap">
                             <button class="btn btn-sm btn-outline-primary flex-fill" onclick="editarUsuario(<?= $usuario['id'] ?>)">
                                 <i class="bi bi-pencil"></i> Editar
                             </button>
+                            <?php if ($usuario['total_atendimentos'] > 0): ?>
+                            <button class="btn btn-sm btn-outline-info" onclick="abrirMigracao(<?= $usuario['id'] ?>, '<?= htmlspecialchars($usuario['nome']) ?>')" title="Migrar atendimentos">
+                                <i class="bi bi-arrow-left-right"></i>
+                            </button>
+                            <?php endif; ?>
                             <?php if ($usuario['ativo']): ?>
                                 <button class="btn btn-sm btn-outline-warning" onclick="toggleAtivo(<?= $usuario['id'] ?>, 0)">
                                     <i class="bi bi-pause-circle"></i> Desativar
@@ -146,17 +151,17 @@ $usuarios = $stmt->fetchAll();
                 <div class="modal-body">
                     <form id="formUsuario">
                         <input type="hidden" id="usuario_id" name="id">
-                        
+
                         <div class="mb-3">
                             <label for="nome" class="form-label">Nome Completo *</label>
                             <input type="text" class="form-control" id="nome" name="nome" required>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="email" class="form-label">E-mail *</label>
                             <input type="email" class="form-control" id="email" name="email" required>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="tipo" class="form-label">Tipo *</label>
                             <select class="form-select" id="tipo" name="tipo" required>
@@ -164,13 +169,13 @@ $usuarios = $stmt->fetchAll();
                                 <option value="admin">Administrador</option>
                             </select>
                         </div>
-                        
+
                         <div class="mb-3" id="campo-senha">
                             <label for="senha" class="form-label">Senha *</label>
                             <input type="password" class="form-control" id="senha" name="senha">
                             <small class="text-muted">Deixe em branco para manter a senha atual (ao editar)</small>
                         </div>
-                        
+
                         <div class="mb-3">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="ativo" name="ativo" checked>
@@ -185,6 +190,63 @@ $usuarios = $stmt->fetchAll();
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="salvarUsuario()">
                         <i class="bi bi-save"></i> Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Migração -->
+    <div class="modal fade" id="modalMigracao" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Migrar Atendimentos</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="migracao_origem_id">
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Transferir atendimentos de <strong id="migracao_origem_nome"></strong> para outro usuário.
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="migracao_destino" class="form-label">Transferir para *</label>
+                        <select class="form-select" id="migracao_destino" required>
+                            <option value="">Selecione o usuário destino...</option>
+                            <?php foreach ($usuarios as $u): ?>
+                            <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['nome']) ?> (<?= $u['total_atendimentos'] ?> atendimentos)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">O que migrar?</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo_migracao" id="migracao_todos" value="todos" checked>
+                            <label class="form-check-label" for="migracao_todos">
+                                Todos os atendimentos
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo_migracao" id="migracao_abertos" value="abertos">
+                            <label class="form-check-label" for="migracao_abertos">
+                                Apenas atendimentos em aberto (pendentes e em andamento)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Atenção:</strong> Esta ação não pode ser desfeita facilmente!
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="executarMigracao()">
+                        <i class="bi bi-arrow-left-right"></i> Migrar Atendimentos
                     </button>
                 </div>
             </div>
@@ -284,11 +346,11 @@ $usuarios = $stmt->fetchAll();
         if (!confirm('Tem certeza que deseja EXCLUIR este usuário?\n\nATENÇÃO: Esta ação não pode ser desfeita!')) {
             return;
         }
-        
+
         if (!confirm('Confirma novamente a exclusão?')) {
             return;
         }
-        
+
         $.ajax({
             url: 'api_excluir_usuario.php',
             method: 'POST',
@@ -300,6 +362,63 @@ $usuarios = $stmt->fetchAll();
                 } else {
                     alert('Erro: ' + response.error);
                 }
+            }
+        });
+    }
+
+    // Migração de atendimentos
+    let modalMigracao;
+
+    function abrirMigracao(usuarioId, nomeUsuario) {
+        document.getElementById('migracao_origem_id').value = usuarioId;
+        document.getElementById('migracao_origem_nome').textContent = nomeUsuario;
+
+        // Esconder opção do mesmo usuário no destino
+        const selectDestino = document.getElementById('migracao_destino');
+        for (let opt of selectDestino.options) {
+            opt.hidden = opt.value == usuarioId;
+        }
+        selectDestino.value = '';
+
+        if (!modalMigracao) {
+            modalMigracao = new bootstrap.Modal(document.getElementById('modalMigracao'));
+        }
+        modalMigracao.show();
+    }
+
+    function executarMigracao() {
+        const origemId = document.getElementById('migracao_origem_id').value;
+        const destinoId = document.getElementById('migracao_destino').value;
+        const tipoMigracao = document.querySelector('input[name="tipo_migracao"]:checked').value;
+
+        if (!destinoId) {
+            alert('Selecione o usuário destino!');
+            return;
+        }
+
+        if (!confirm('Confirma a migração dos atendimentos?\n\nEsta ação transferirá os atendimentos para o novo usuário.')) {
+            return;
+        }
+
+        $.ajax({
+            url: 'api_migrar_atendimentos.php',
+            method: 'POST',
+            data: {
+                origem_id: origemId,
+                destino_id: destinoId,
+                tipo: tipoMigracao
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('Migração realizada com sucesso!\n\n' + response.migrados + ' atendimentos foram transferidos.');
+                    modalMigracao.hide();
+                    location.reload();
+                } else {
+                    alert('Erro: ' + response.error);
+                }
+            },
+            error: function() {
+                alert('Erro na requisição');
             }
         });
     }
