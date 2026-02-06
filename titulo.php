@@ -98,10 +98,37 @@ $secao_registro = ['titulo' => 'Registro Pós-Ligação', 'icone' => 'bi-journal
 
 // Buscar tentativas
 $tentativas = [];
+$precisa_followup = false;
+$ultima_tentativa = null;
+$horas_desde_ultima = 0;
+$sugestao_contato = 'telefone';
 try {
     $stmt_tent = $db->prepare("SELECT tc.*, u.nome as nome_usuario FROM tentativas_contato tc LEFT JOIN usuarios u ON tc.usuario_id = u.id WHERE tc.boas_vindas_id = :id ORDER BY tc.criado_em DESC");
     $stmt_tent->execute([':id' => $titulo['id']]);
     $tentativas = $stmt_tent->fetchAll();
+
+    // Verificar se precisa de follow-up
+    if (!empty($tentativas) && $titulo['status'] !== 'concluido') {
+        $ultima_tentativa = $tentativas[0];
+        $resultados_sem_sucesso = ['nao_atendeu', 'caixa_postal', 'so_chamou', 'desligou'];
+
+        if (in_array($ultima_tentativa['resultado'], $resultados_sem_sucesso)) {
+            $precisa_followup = true;
+            $data_ultima = new DateTime($ultima_tentativa['criado_em']);
+            $agora = new DateTime();
+            $diff = $agora->diff($data_ultima);
+            $horas_desde_ultima = ($diff->days * 24) + $diff->h;
+
+            // Sugerir tipo de contato baseado na última tentativa
+            if ($ultima_tentativa['tipo_tentativa'] === 'ligacao') {
+                $sugestao_contato = 'whatsapp';
+            } elseif ($ultima_tentativa['tipo_tentativa'] === 'whatsapp') {
+                $sugestao_contato = 'email';
+            } else {
+                $sugestao_contato = 'telefone';
+            }
+        }
+    }
 } catch (Exception $e) {}
 
 // Buscar logs
@@ -119,36 +146,47 @@ try {
     foreach ($stmt_cfg->fetchAll() as $c) $configs[$c['chave']] = $c['valor'];
 } catch (Exception $e) {}
 
-// Buscar título anterior e próximo para navegação (ordenado por numero_titulo)
+// Buscar título anterior e próximo para navegação
 $titulo_anterior = null;
 $titulo_proximo = null;
 try {
-    // Extrair número do título atual (ex: SFA-11132 -> 11132)
-    $numero_atual = preg_replace('/[^0-9]/', '', $titulo['numero_titulo']);
+    $numero_titulo_atual = $titulo['numero_titulo'];
+    $user_id = Auth::getUserId();
 
-    // Próximo (número maior, não concluído)
-    $stmt_prox = $db->prepare("
+    // Buscar todos títulos não concluídos do usuário e ordenar em PHP
+    $stmt_all = $db->prepare("
         SELECT numero_titulo, status FROM boas_vindas
-        WHERE usuario_id = :user_id
-        AND status != 'concluido'
-        AND CAST(REGEXP_REPLACE(numero_titulo, '[^0-9]', '') AS UNSIGNED) > :numero_atual
-        ORDER BY CAST(REGEXP_REPLACE(numero_titulo, '[^0-9]', '') AS UNSIGNED) ASC
-        LIMIT 1
+        WHERE usuario_id = :user_id AND status != 'concluido'
+        ORDER BY numero_titulo ASC
     ");
-    $stmt_prox->execute([':user_id' => Auth::getUserId(), ':numero_atual' => $numero_atual]);
-    $titulo_proximo = $stmt_prox->fetch();
+    $stmt_all->execute([':user_id' => $user_id]);
+    $todos_titulos = $stmt_all->fetchAll();
 
-    // Anterior (número menor, não concluído)
-    $stmt_ant = $db->prepare("
-        SELECT numero_titulo, status FROM boas_vindas
-        WHERE usuario_id = :user_id
-        AND status != 'concluido'
-        AND CAST(REGEXP_REPLACE(numero_titulo, '[^0-9]', '') AS UNSIGNED) < :numero_atual
-        ORDER BY CAST(REGEXP_REPLACE(numero_titulo, '[^0-9]', '') AS UNSIGNED) DESC
-        LIMIT 1
-    ");
-    $stmt_ant->execute([':user_id' => Auth::getUserId(), ':numero_atual' => $numero_atual]);
-    $titulo_anterior = $stmt_ant->fetch();
+    // Extrair números e ordenar corretamente
+    $titulos_ordenados = [];
+    foreach ($todos_titulos as $t) {
+        $num = intval(preg_replace('/[^0-9]/', '', $t['numero_titulo']));
+        $titulos_ordenados[] = ['numero_titulo' => $t['numero_titulo'], 'num' => $num];
+    }
+    usort($titulos_ordenados, fn($a, $b) => $a['num'] - $b['num']);
+
+    // Encontrar posição atual e pegar anterior/próximo
+    $num_atual = intval(preg_replace('/[^0-9]/', '', $numero_titulo_atual));
+    $anterior = null;
+    $proximo = null;
+
+    foreach ($titulos_ordenados as $i => $t) {
+        if ($t['num'] < $num_atual) {
+            $anterior = $t;
+        }
+        if ($t['num'] > $num_atual && !$proximo) {
+            $proximo = $t;
+            break;
+        }
+    }
+
+    if ($anterior) $titulo_anterior = ['numero_titulo' => $anterior['numero_titulo']];
+    if ($proximo) $titulo_proximo = ['numero_titulo' => $proximo['numero_titulo']];
 } catch (Exception $e) {}
 
 // Verificar se cliente tem ciência do título (flag para alerta vermelho)
@@ -537,6 +575,33 @@ function isValidScript($script) {
                 </div>
             </div>
         </div>
+
+        <?php if ($precisa_followup && $titulo['status'] !== 'concluido'): ?>
+        <!-- Alerta de Follow-up -->
+        <div class="alert alert-warning d-flex align-items-center justify-content-between py-2 mb-2" style="font-size: 12px;">
+            <div>
+                <i class="bi bi-bell-fill me-2"></i>
+                <strong>Nova tentativa necessária!</strong>
+                Última tentativa: <?= ucfirst(str_replace('_', ' ', $ultima_tentativa['resultado'])) ?>
+                há <?= $horas_desde_ultima ?> hora<?= $horas_desde_ultima != 1 ? 's' : '' ?>
+            </div>
+            <div class="d-flex gap-2">
+                <?php if (!empty($titulo['telefone'])): ?>
+                <a href="tel:<?= preg_replace('/[^0-9]/', '', $titulo['telefone']) ?>" class="btn btn-sm btn-outline-primary <?= $sugestao_contato === 'telefone' ? 'btn-primary text-white' : '' ?>">
+                    <i class="bi bi-telephone"></i> Ligar
+                </a>
+                <a href="https://wa.me/55<?= preg_replace('/[^0-9]/', '', $titulo['telefone']) ?>" target="_blank" class="btn btn-sm btn-outline-success <?= $sugestao_contato === 'whatsapp' ? 'btn-success text-white' : '' ?>">
+                    <i class="bi bi-whatsapp"></i> WhatsApp
+                </a>
+                <?php endif; ?>
+                <?php if (!empty($titulo['email'])): ?>
+                <a href="mailto:<?= htmlspecialchars($titulo['email']) ?>" class="btn btn-sm btn-outline-info <?= $sugestao_contato === 'email' ? 'btn-info text-white' : '' ?>">
+                    <i class="bi bi-envelope"></i> E-mail
+                </a>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Main 3-Column Content -->
         <div class="main-container">
@@ -1116,11 +1181,16 @@ function isValidScript($script) {
                         <input type="text" class="form-control" id="info_extra_valor" placeholder="Ex: Pagou no PIX, Vendedor João...">
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="salvarInfoExtra()">
-                        <i class="bi bi-save"></i> Salvar
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerInfoExtra()" id="btnRemoverInfo" style="display: none;">
+                        <i class="bi bi-trash"></i> Remover
                     </button>
+                    <div>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="salvarInfoExtra()">
+                            <i class="bi bi-save"></i> Salvar
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1285,10 +1355,14 @@ function isValidScript($script) {
     });
 
     document.querySelectorAll('.rating-stars').forEach(container => {
+        // Pular o rating de feedback BV (tem handler próprio)
+        if (container.id === 'rating_atendente_bv') return;
+
         container.querySelectorAll('i').forEach(star => {
             star.addEventListener('click', function() {
                 const val = this.dataset.value;
                 const codigo = this.parentElement.dataset.codigo;
+                if (!codigo) return; // Proteção extra
                 this.parentElement.querySelectorAll('i').forEach((s, i) => {
                     s.classList.toggle('active', i < val);
                 });
@@ -1363,17 +1437,27 @@ function isValidScript($script) {
     }
 
     // Modal info extra
+    const infoPagamentoAtual = '<?= addslashes($titulo['pagamento_obs'] ?? '') ?>';
+    const infoConsultorAtual = '<?= addslashes($titulo['promotor_obs'] ?? '') ?>';
+
     function abrirModalInfo(tipo) {
         document.getElementById('info_extra_tipo').value = tipo;
+        let valorAtual = '';
+
         if (tipo === 'pagamento') {
             document.getElementById('modalInfoExtraTitulo').innerHTML = '<i class="bi bi-credit-card"></i> Info Pagamento';
             document.getElementById('info_extra_label').textContent = 'Observação sobre pagamento';
             document.getElementById('info_extra_valor').placeholder = 'Ex: Pagou no PIX, Parcelou em 3x...';
+            valorAtual = infoPagamentoAtual;
         } else {
             document.getElementById('modalInfoExtraTitulo').innerHTML = '<i class="bi bi-person"></i> Info Consultor';
             document.getElementById('info_extra_label').textContent = 'Observação sobre o consultor';
             document.getElementById('info_extra_valor').placeholder = 'Ex: Vendedor real: João, Indicação...';
+            valorAtual = infoConsultorAtual;
         }
+
+        document.getElementById('info_extra_valor').value = valorAtual;
+        document.getElementById('btnRemoverInfo').style.display = valorAtual ? 'inline-block' : 'none';
     }
 
     function salvarInfoExtra() {
@@ -1395,6 +1479,29 @@ function isValidScript($script) {
                 }
             },
             error: () => showToast('Erro ao salvar', 'danger')
+        });
+    }
+
+    function removerInfoExtra() {
+        if (!confirm('Deseja remover esta observação?')) return;
+
+        const tipo = document.getElementById('info_extra_tipo').value;
+        const campo = tipo === 'pagamento' ? 'pagamento_obs' : 'promotor_obs';
+
+        $.ajax({
+            url: baseUrl + '/api_salvar_boasvindas.php',
+            method: 'POST',
+            data: { id: boasVindasId, [campo]: '' },
+            success: function(response) {
+                if (response.success) {
+                    showToast('Observação removida!');
+                    bootstrap.Modal.getInstance(document.getElementById('modalInfoExtra')).hide();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showToast('Erro: ' + response.error, 'danger');
+                }
+            },
+            error: () => showToast('Erro ao remover', 'danger')
         });
     }
 

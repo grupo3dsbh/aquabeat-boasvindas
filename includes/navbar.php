@@ -74,6 +74,39 @@ try {
         $notificacoes['agendados'] = $stmt_agendados->fetch()['total'] ?? 0;
     } catch (Exception $e) {}
 
+    // Buscar lista detalhada de atendimentos que precisam de follow-up (limite 10)
+    $atendimentos_followup = [];
+    try {
+        $stmt_followup = $db_nav->prepare("
+            SELECT
+                bv.id,
+                bv.numero_titulo,
+                bv.nome_cliente,
+                bv.status,
+                bv.resultado_ultimo_contato,
+                bv.data_ultimo_contato,
+                bv.proxima_tentativa,
+                TIMESTAMPDIFF(HOUR, COALESCE(bv.data_ultimo_contato, bv.criado_em), NOW()) as horas_desde_ultima
+            FROM boas_vindas bv
+            WHERE bv.status IN ('pendente', 'em_andamento')
+            AND (
+                bv.resultado_ultimo_contato IN ('nao_atendeu', 'ocupado', 'caixa_postal')
+                OR (bv.resultado_ultimo_contato IS NULL AND DATEDIFF(NOW(), bv.criado_em) > 0)
+                OR DATE(bv.proxima_tentativa) <= CURDATE()
+            )
+            AND (bv.usuario_id = :usuario_id OR :is_admin = 1)
+            ORDER BY
+                CASE WHEN DATE(bv.proxima_tentativa) = CURDATE() THEN 0 ELSE 1 END,
+                COALESCE(bv.data_ultimo_contato, bv.criado_em) ASC
+            LIMIT 10
+        ");
+        $stmt_followup->execute([
+            ':usuario_id' => Auth::getUserId(),
+            ':is_admin' => Auth::isAdmin() ? 1 : 0
+        ]);
+        $atendimentos_followup = $stmt_followup->fetchAll();
+    } catch (Exception $e) {}
+
 } catch (Exception $e) {}
 
 $total_notificacoes = $notificacoes['vendas_pendentes'] + $notificacoes['retornos'] + $notificacoes['agendados'];
@@ -120,44 +153,110 @@ $total_notificacoes = $notificacoes['vendas_pendentes'] + $notificacoes['retorno
                         </span>
                         <?php endif; ?>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end" style="min-width: 300px;">
-                        <li><h6 class="dropdown-header">Notificações</h6></li>
-                        <?php if ($total_notificacoes === 0): ?>
-                        <li><span class="dropdown-item-text text-muted">Nenhuma notificação</span></li>
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown" style="min-width: 380px; max-height: 500px; overflow-y: auto;">
+                        <li><h6 class="dropdown-header d-flex justify-content-between align-items-center">
+                            <span>Notificações</span>
+                            <?php if ($total_notificacoes > 0): ?>
+                            <span class="badge bg-primary"><?= $total_notificacoes ?></span>
+                            <?php endif; ?>
+                        </h6></li>
+
+                        <!-- Resumo por categoria -->
+                        <?php if ($total_notificacoes > 0): ?>
+                        <li class="px-3 py-2 bg-light border-bottom">
+                            <div class="d-flex gap-2 flex-wrap">
+                                <?php if ($notificacoes['vendas_pendentes'] > 0): ?>
+                                <a href="<?= $nav_base ?>/index?filtro=pendentes" class="badge bg-warning text-decoration-none" title="Vendas pendentes (+1 dia)">
+                                    <i class="bi bi-clock"></i> <?= $notificacoes['vendas_pendentes'] ?> pendentes
+                                </a>
+                                <?php endif; ?>
+                                <?php if ($notificacoes['retornos'] > 0): ?>
+                                <a href="<?= $nav_base ?>/index?filtro=retornos" class="badge bg-danger text-decoration-none" title="Não atenderam">
+                                    <i class="bi bi-telephone-x"></i> <?= $notificacoes['retornos'] ?> retornos
+                                </a>
+                                <?php endif; ?>
+                                <?php if ($notificacoes['agendados'] > 0): ?>
+                                <a href="<?= $nav_base ?>/index?filtro=agendados" class="badge bg-info text-decoration-none" title="Agendados para hoje">
+                                    <i class="bi bi-calendar-check"></i> <?= $notificacoes['agendados'] ?> hoje
+                                </a>
+                                <?php endif; ?>
+                            </div>
+                        </li>
+                        <?php endif; ?>
+
+                        <!-- Lista detalhada de atendimentos -->
+                        <?php if (empty($atendimentos_followup)): ?>
+                        <li><span class="dropdown-item-text text-muted text-center py-3">
+                            <i class="bi bi-check-circle text-success"></i><br>
+                            Nenhum follow-up pendente
+                        </span></li>
                         <?php else: ?>
-                            <?php if ($notificacoes['vendas_pendentes'] > 0): ?>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="<?= $nav_base ?>/index?filtro=pendentes">
-                                    <span class="badge bg-warning me-2"><?= $notificacoes['vendas_pendentes'] ?></span>
-                                    <div>
-                                        <strong>Vendas Pendentes</strong>
-                                        <small class="d-block text-muted">Mais de 1 dia sem contato</small>
+                        <li><small class="dropdown-header text-uppercase">Atendimentos para contato</small></li>
+                        <?php foreach ($atendimentos_followup as $atend):
+                            // Calcular tempo formatado
+                            $horas = intval($atend['horas_desde_ultima']);
+                            if ($horas < 24) {
+                                $tempo_str = $horas . 'h';
+                            } else {
+                                $dias = floor($horas / 24);
+                                $tempo_str = $dias . ' dia' . ($dias > 1 ? 's' : '');
+                            }
+
+                            // Determinar motivo/tipo
+                            $motivo = 'Aguardando contato';
+                            $badge_class = 'bg-secondary';
+                            $icon = 'bi-clock';
+
+                            if ($atend['proxima_tentativa'] && date('Y-m-d', strtotime($atend['proxima_tentativa'])) == date('Y-m-d')) {
+                                $motivo = 'Agendado para hoje';
+                                $badge_class = 'bg-info';
+                                $icon = 'bi-calendar-check';
+                            } elseif ($atend['resultado_ultimo_contato'] == 'nao_atendeu') {
+                                $motivo = 'Não atendeu';
+                                $badge_class = 'bg-danger';
+                                $icon = 'bi-telephone-x';
+                            } elseif ($atend['resultado_ultimo_contato'] == 'ocupado') {
+                                $motivo = 'Ocupado';
+                                $badge_class = 'bg-warning text-dark';
+                                $icon = 'bi-telephone-minus';
+                            } elseif ($atend['resultado_ultimo_contato'] == 'caixa_postal') {
+                                $motivo = 'Caixa postal';
+                                $badge_class = 'bg-secondary';
+                                $icon = 'bi-voicemail';
+                            }
+
+                            $nome_curto = mb_strlen($atend['nome_cliente']) > 25
+                                ? mb_substr($atend['nome_cliente'], 0, 22) . '...'
+                                : $atend['nome_cliente'];
+                        ?>
+                        <li>
+                            <a class="dropdown-item notification-item py-2" href="<?= $nav_base ?>/titulo?id=<?= $atend['id'] ?>">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-truncate" style="max-width: 200px;">
+                                            <?= htmlspecialchars($atend['numero_titulo']) ?>
+                                        </div>
+                                        <small class="text-muted d-block"><?= htmlspecialchars($nome_curto) ?></small>
                                     </div>
-                                </a>
-                            </li>
-                            <?php endif; ?>
-                            <?php if ($notificacoes['retornos'] > 0): ?>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="<?= $nav_base ?>/index?filtro=retornos">
-                                    <span class="badge bg-danger me-2"><?= $notificacoes['retornos'] ?></span>
-                                    <div>
-                                        <strong>Retornos Pendentes</strong>
-                                        <small class="d-block text-muted">Cliente não atendeu</small>
+                                    <div class="text-end ms-2">
+                                        <span class="badge <?= $badge_class ?> mb-1">
+                                            <i class="bi <?= $icon ?>"></i> <?= $motivo ?>
+                                        </span>
+                                        <small class="text-muted d-block"><?= $tempo_str ?> atrás</small>
                                     </div>
-                                </a>
-                            </li>
-                            <?php endif; ?>
-                            <?php if ($notificacoes['agendados'] > 0): ?>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="<?= $nav_base ?>/index?filtro=agendados">
-                                    <span class="badge bg-info me-2"><?= $notificacoes['agendados'] ?></span>
-                                    <div>
-                                        <strong>Agendados Hoje</strong>
-                                        <small class="d-block text-muted">Retornos programados</small>
-                                    </div>
-                                </a>
-                            </li>
-                            <?php endif; ?>
+                                </div>
+                            </a>
+                        </li>
+                        <?php endforeach; ?>
+
+                        <!-- Link carregar mais -->
+                        <?php if (count($atendimentos_followup) >= 10): ?>
+                        <li class="border-top">
+                            <a class="dropdown-item text-center text-primary py-2" href="<?= $nav_base ?>/index?filtro=followup">
+                                <i class="bi bi-arrow-down-circle"></i> Ver todos os pendentes
+                            </a>
+                        </li>
+                        <?php endif; ?>
                         <?php endif; ?>
                     </ul>
                 </li>

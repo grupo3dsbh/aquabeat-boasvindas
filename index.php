@@ -72,36 +72,69 @@ $stmt_stats = $db_bv->prepare("
 $stmt_stats->execute([':usuario_id' => $usuario_id]);
 $stats_usuario = $stmt_stats->fetch();
 
-// Estatisticas gerais (para admin)
+// Estatisticas gerais (para todos verem)
 $stats_geral = null;
-if (Auth::isAdmin()) {
+try {
     $stmt_geral = $db_bv->query("
         SELECT
             COUNT(*) as total,
             SUM(CASE WHEN status = 'concluido' THEN 1 ELSE 0 END) as concluidos,
             SUM(CASE WHEN status = 'em_andamento' THEN 1 ELSE 0 END) as em_andamento,
+            SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as pendentes,
             COUNT(DISTINCT usuario_id) as atendentes_ativos
         FROM boas_vindas
         WHERE DATE(criado_em) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
     ");
     $stats_geral = $stmt_geral->fetch();
-}
+} catch (Exception $e) {}
+
+// Buscar CPFs duplicados (mesmo CPF em títulos diferentes)
+$cpfs_duplicados = [];
+try {
+    $stmt_dup = $db_bv->query("
+        SELECT documento_cliente, COUNT(*) as qtd, GROUP_CONCAT(numero_titulo SEPARATOR ', ') as titulos
+        FROM boas_vindas
+        WHERE documento_cliente IS NOT NULL AND documento_cliente != ''
+        GROUP BY documento_cliente
+        HAVING COUNT(*) > 1
+        ORDER BY qtd DESC
+        LIMIT 20
+    ");
+    $cpfs_duplicados = $stmt_dup->fetchAll();
+} catch (Exception $e) {}
 
 // Filtro de status para atendimentos
 $status_condition = '';
-switch ($filtro_status_atend) {
-    case 'abertos':
-        $status_condition = "AND bv.status IN ('pendente', 'em_andamento')";
-        break;
-    case 'concluidos':
-        $status_condition = "AND bv.status = 'concluido'";
-        break;
-    case 'pendentes':
-        $status_condition = "AND bv.status = 'pendente'";
-        break;
-    case 'em_andamento':
-        $status_condition = "AND bv.status = 'em_andamento'";
-        break;
+
+// Verificar se há filtro especial da barra de notificações
+$filtro_notificacao = $_GET['filtro'] ?? '';
+if ($filtro_notificacao === 'retornos') {
+    $status_condition = "AND bv.status IN ('pendente', 'em_andamento') AND bv.resultado_ultimo_contato IN ('nao_atendeu', 'ocupado', 'caixa_postal')";
+} elseif ($filtro_notificacao === 'agendados') {
+    $status_condition = "AND bv.status IN ('pendente', 'em_andamento') AND DATE(bv.proxima_tentativa) = CURDATE()";
+} elseif ($filtro_notificacao === 'pendentes') {
+    $status_condition = "AND bv.status = 'pendente' AND DATEDIFF(NOW(), bv.data_venda) > 1";
+} elseif ($filtro_notificacao === 'followup') {
+    $status_condition = "AND bv.status IN ('pendente', 'em_andamento') AND (
+        bv.resultado_ultimo_contato IN ('nao_atendeu', 'ocupado', 'caixa_postal')
+        OR (bv.resultado_ultimo_contato IS NULL AND DATEDIFF(NOW(), bv.criado_em) > 0)
+        OR DATE(bv.proxima_tentativa) <= CURDATE()
+    )";
+} else {
+    switch ($filtro_status_atend) {
+        case 'abertos':
+            $status_condition = "AND bv.status IN ('pendente', 'em_andamento')";
+            break;
+        case 'concluidos':
+            $status_condition = "AND bv.status = 'concluido'";
+            break;
+        case 'pendentes':
+            $status_condition = "AND bv.status = 'pendente'";
+            break;
+        case 'em_andamento':
+            $status_condition = "AND bv.status = 'em_andamento'";
+            break;
+    }
 }
 
 $stmt_andamento = $db_bv->prepare("
@@ -239,76 +272,87 @@ $em_andamento = $stmt_andamento->fetchAll();
     <?php include 'includes/navbar.php'; ?>
 
     <div class="container-fluid mt-4">
-        <!-- Pesquisa Global -->
-        <div class="row mb-4">
-            <div class="col-12">
+        <!-- Pesquisa Global + Ações -->
+        <div class="row mb-3">
+            <div class="col-md-8 col-lg-9">
                 <div class="search-global">
                     <i class="bi bi-search"></i>
                     <input type="text" class="form-control form-control-lg" id="searchGlobal" placeholder="Pesquisar por CPF, ID do Título ou Nome do Cliente...">
                     <div class="search-results" id="searchResults"></div>
                 </div>
             </div>
-        </div>
-
-        <!-- Botão de Atualização em Massa -->
-        <div class="row mb-3">
-            <div class="col-12 text-end">
+            <div class="col-md-4 col-lg-3 d-flex gap-2 align-items-center justify-content-end mt-2 mt-md-0">
                 <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBulk">
-                    <i class="bi bi-collection"></i> Atualização em Massa
+                    <i class="bi bi-collection"></i> Em Massa
                 </button>
+                <?php if (!empty($cpfs_duplicados)): ?>
+                <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalDuplicados">
+                    <i class="bi bi-exclamation-triangle"></i> <?= count($cpfs_duplicados) ?> Duplicados
+                </button>
+                <?php endif; ?>
             </div>
         </div>
 
-        <!-- Cards de Estatisticas -->
-        <div class="row mb-4">
-            <div class="col-md-4">
+        <!-- Cards de Estatisticas Gerais -->
+        <div class="row mb-3">
+            <div class="col-md-3">
                 <div class="stat-card">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="text-muted mb-1">Meus Atendimentos</div>
-                            <div class="number text-primary"><?= $stats_usuario['total'] ?? 0 ?></div>
+                            <div class="text-muted mb-1">Total Geral</div>
+                            <div class="number text-primary"><?= $stats_geral['total'] ?? 0 ?></div>
+                            <small class="text-muted" style="font-size: 10px;">Meus: <?= $stats_usuario['total'] ?? 0 ?></small>
                         </div>
                         <div class="icon text-primary"><i class="bi bi-clipboard-check"></i></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="stat-card">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <div class="text-muted mb-1">Concluídos</div>
-                            <div class="number text-success"><?= $stats_usuario['concluidos'] ?? 0 ?></div>
+                            <div class="number text-success"><?= $stats_geral['concluidos'] ?? 0 ?></div>
+                            <small class="text-muted" style="font-size: 10px;">Meus: <?= $stats_usuario['concluidos'] ?? 0 ?></small>
                         </div>
                         <div class="icon text-success"><i class="bi bi-check-circle"></i></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="stat-card">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <div class="text-muted mb-1">Em Andamento</div>
-                            <div class="number text-warning"><?= $stats_usuario['em_andamento'] ?? 0 ?></div>
+                            <div class="number text-warning"><?= $stats_geral['em_andamento'] ?? 0 ?></div>
+                            <small class="text-muted" style="font-size: 10px;">Meus: <?= $stats_usuario['em_andamento'] ?? 0 ?></small>
                         </div>
                         <div class="icon text-warning"><i class="bi bi-hourglass-split"></i></div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <?php if (Auth::isAdmin() && $stats_geral): ?>
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="alert alert-info mb-0">
-                    <i class="bi bi-info-circle"></i>
-                    <strong>Últimos 30 dias:</strong>
-                    <?= $stats_geral['total'] ?> atendimentos |
-                    <?= $stats_geral['concluidos'] ?> concluídos |
-                    <?= $stats_geral['atendentes_ativos'] ?> atendentes ativos
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted mb-1">Pendentes</div>
+                            <div class="number text-secondary"><?= $stats_geral['pendentes'] ?? 0 ?></div>
+                            <small class="text-muted" style="font-size: 10px;">Meus: <?= $stats_usuario['pendentes'] ?? 0 ?></small>
+                        </div>
+                        <div class="icon text-secondary"><i class="bi bi-clock-history"></i></div>
+                    </div>
                 </div>
             </div>
         </div>
-        <?php endif; ?>
+
+        <div class="row mb-3">
+            <div class="col-12">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i> Últimos 30 dias |
+                    <?= $stats_geral['atendentes_ativos'] ?? 0 ?> atendentes ativos
+                </small>
+            </div>
+        </div>
 
         <div class="row">
             <!-- Meus Atendimentos -->
@@ -484,6 +528,51 @@ $em_andamento = $stmt_andamento->fetchAll();
                         <button type="submit" class="btn btn-primary">Aplicar</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal CPFs Duplicados -->
+    <div class="modal fade" id="modalDuplicados" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle text-warning"></i> CPFs Duplicados</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Clientes com mesmo CPF em múltiplos títulos:</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>CPF/CNPJ</th>
+                                    <th>Qtd</th>
+                                    <th>Títulos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($cpfs_duplicados as $dup): ?>
+                                <tr>
+                                    <td><?= formatarDocumento($dup['documento_cliente']) ?></td>
+                                    <td><span class="badge bg-warning"><?= $dup['qtd'] ?></span></td>
+                                    <td>
+                                        <?php
+                                        $titulos = explode(', ', $dup['titulos']);
+                                        foreach ($titulos as $t):
+                                        ?>
+                                        <a href="titulo?id=<?= htmlspecialchars(trim($t)) ?>" class="badge bg-primary text-decoration-none me-1"><?= htmlspecialchars(trim($t)) ?></a>
+                                        <?php endforeach; ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
             </div>
         </div>
     </div>
