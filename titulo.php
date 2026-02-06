@@ -151,18 +151,20 @@ $titulo_anterior = null;
 $titulo_proximo = null;
 try {
     $numero_titulo_atual = $titulo['numero_titulo'];
-    $user_id = Auth::getUserId();
+    // Usar o usuario_id do TÍTULO ATUAL (não do usuário logado)
+    // Isso permite navegação correta quando admin visualiza títulos de outros
+    $owner_id = $titulo['usuario_id'] ?? Auth::getUserId();
 
-    // Buscar todos títulos não concluídos do usuário e ordenar em PHP
+    // Buscar todos títulos não concluídos do mesmo dono
     $stmt_all = $db->prepare("
         SELECT numero_titulo, status FROM boas_vindas
         WHERE usuario_id = :user_id AND status != 'concluido'
         ORDER BY numero_titulo ASC
     ");
-    $stmt_all->execute([':user_id' => $user_id]);
+    $stmt_all->execute([':user_id' => $owner_id]);
     $todos_titulos = $stmt_all->fetchAll();
 
-    // Extrair números e ordenar corretamente
+    // Extrair números e ordenar corretamente por valor numérico
     $titulos_ordenados = [];
     foreach ($todos_titulos as $t) {
         $num = intval(preg_replace('/[^0-9]/', '', $t['numero_titulo']));
@@ -172,21 +174,25 @@ try {
 
     // Encontrar posição atual e pegar anterior/próximo
     $num_atual = intval(preg_replace('/[^0-9]/', '', $numero_titulo_atual));
-    $anterior = null;
-    $proximo = null;
+    $posicao_atual = -1;
 
+    // Primeiro encontrar a posição exata do título atual
     foreach ($titulos_ordenados as $i => $t) {
-        if ($t['num'] < $num_atual) {
-            $anterior = $t;
-        }
-        if ($t['num'] > $num_atual && !$proximo) {
-            $proximo = $t;
+        if ($t['numero_titulo'] === $numero_titulo_atual) {
+            $posicao_atual = $i;
             break;
         }
     }
 
-    if ($anterior) $titulo_anterior = ['numero_titulo' => $anterior['numero_titulo']];
-    if ($proximo) $titulo_proximo = ['numero_titulo' => $proximo['numero_titulo']];
+    // Se encontrou, pegar anterior e próximo por índice
+    if ($posicao_atual >= 0) {
+        if ($posicao_atual > 0) {
+            $titulo_anterior = ['numero_titulo' => $titulos_ordenados[$posicao_atual - 1]['numero_titulo']];
+        }
+        if ($posicao_atual < count($titulos_ordenados) - 1) {
+            $titulo_proximo = ['numero_titulo' => $titulos_ordenados[$posicao_atual + 1]['numero_titulo']];
+        }
+    }
 } catch (Exception $e) {}
 
 // Verificar se cliente tem ciência do título (flag para alerta vermelho)
