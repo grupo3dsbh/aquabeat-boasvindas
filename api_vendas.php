@@ -33,6 +33,9 @@ try {
     $data_inicio = $_GET['data_inicio'] ?? date('Y-m-01');
     $data_fim = $_GET['data_fim'] ?? date('Y-m-t');
     $filtro_status = $_GET['status'] ?? 'abertos'; // abertos, concluidos, todos
+    $pagina = max(1, intval($_GET['pagina'] ?? 1));
+    $por_pagina = min(200, max(20, intval($_GET['por_pagina'] ?? 50)));
+    $offset = ($pagina - 1) * $por_pagina;
 
     // Validar datas
     $primeiro_dia_mes = date('Y-m-d 00:00:00', strtotime($data_inicio));
@@ -105,13 +108,24 @@ try {
         $sql .= " WHERE " . implode(' AND ', $where);
     }
 
+    // Primeiro, contar total de registros
+    $sql_count = "SELECT COUNT(*) as total FROM titulos";
+    if (!empty($where)) {
+        $sql_count .= " WHERE " . implode(' AND ', $where);
+    }
+    $stmt_count = $db_api->prepare($sql_count);
+    $stmt_count->execute($params);
+    $total_registros = $stmt_count->fetch()['total'];
+
     if ($campo_data) {
         $sql .= " ORDER BY $campo_data DESC";
     } else {
         $sql .= " ORDER BY id DESC";
     }
 
-    $sql .= " LIMIT 100";
+    // Sem limite para poder filtrar por status depois (o filtro de status é em PHP)
+    // Mas com limite razoável para não sobrecarregar
+    $sql .= " LIMIT 500";
 
     $stmt = $db_api->prepare($sql);
     $stmt->execute($params);
@@ -169,10 +183,19 @@ try {
         }
     }
 
+    // Aplicar paginação nos resultados filtrados
+    $total_filtrado = count($vendas_filtradas);
+    $total_paginas = ceil($total_filtrado / $por_pagina);
+    $vendas_paginadas = array_slice($vendas_filtradas, $offset, $por_pagina);
+
     jsonResponse([
         'success' => true,
-        'data' => $vendas_filtradas,
-        'total' => count($vendas_filtradas),
+        'data' => $vendas_paginadas,
+        'total' => $total_filtrado,
+        'total_registros_periodo' => $total_registros,
+        'pagina' => $pagina,
+        'por_pagina' => $por_pagina,
+        'total_paginas' => $total_paginas,
         'periodo' => [
             'inicio' => $primeiro_dia_mes,
             'fim' => $ultimo_dia_mes

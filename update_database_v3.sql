@@ -6,6 +6,12 @@ ALTER TABLE boas_vindas
     ADD COLUMN IF NOT EXISTS pagamento_obs VARCHAR(255) DEFAULT NULL COMMENT 'Observação extra sobre pagamento',
     ADD COLUMN IF NOT EXISTS promotor_obs VARCHAR(255) DEFAULT NULL COMMENT 'Observação extra sobre o consultor/promotor';
 
+-- Adicionar colunas para feedback do atendente boas-vindas
+ALTER TABLE boas_vindas
+    ADD COLUMN IF NOT EXISTS nota_atendimento_bv INT DEFAULT NULL COMMENT 'Nota de 1-5 do atendente boas-vindas',
+    ADD COLUMN IF NOT EXISTS feedback_atendente_bv TEXT DEFAULT NULL COMMENT 'Feedback escrito do atendente boas-vindas',
+    ADD COLUMN IF NOT EXISTS classificacao_bv VARCHAR(50) DEFAULT NULL COMMENT 'Classificação: Excelente, Bom, Regular, Difícil';
+
 -- Índice para pesquisa por documento
 ALTER TABLE boas_vindas
     ADD INDEX IF NOT EXISTS idx_documento_cliente (documento_cliente);

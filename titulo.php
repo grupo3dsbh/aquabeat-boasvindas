@@ -119,6 +119,40 @@ try {
     foreach ($stmt_cfg->fetchAll() as $c) $configs[$c['chave']] = $c['valor'];
 } catch (Exception $e) {}
 
+// Buscar título anterior e próximo para navegação
+$titulo_anterior = null;
+$titulo_proximo = null;
+try {
+    // Próximo (ID maior, não concluído)
+    $stmt_prox = $db->prepare("
+        SELECT numero_titulo, status FROM boas_vindas
+        WHERE id > :id AND usuario_id = :user_id AND status != 'concluido'
+        ORDER BY id ASC LIMIT 1
+    ");
+    $stmt_prox->execute([':id' => $titulo['id'], ':user_id' => Auth::getUserId()]);
+    $titulo_proximo = $stmt_prox->fetch();
+
+    // Anterior (ID menor, não concluído)
+    $stmt_ant = $db->prepare("
+        SELECT numero_titulo, status FROM boas_vindas
+        WHERE id < :id AND usuario_id = :user_id AND status != 'concluido'
+        ORDER BY id DESC LIMIT 1
+    ");
+    $stmt_ant->execute([':id' => $titulo['id'], ':user_id' => Auth::getUserId()]);
+    $titulo_anterior = $stmt_ant->fetch();
+} catch (Exception $e) {}
+
+// Verificar se cliente tem ciência do título (flag para alerta vermelho)
+$sem_ciencia_titulo = false;
+try {
+    if (isset($interacoes['valid_cliente_ciente'])) {
+        $val = $interacoes['valid_cliente_ciente']['valor_texto'] ?? '';
+        if (in_array($val, ['Não', 'Negativo', 'Não, corrigido'])) {
+            $sem_ciencia_titulo = true;
+        }
+    }
+} catch (Exception $e) {}
+
 // Mapeamento de nomes amigáveis para atividades
 $nomes_amigaveis = [
     'checkbox_marcado' => 'Item marcado',
@@ -321,6 +355,35 @@ function isValidScript($script) {
         .search-box input { padding-left: 35px; font-size: 12px; }
         .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #999; }
         .search-highlight { background: #fff3cd; font-weight: bold; }
+
+        /* Response radio inline */
+        .response-radio-inline {
+            display: flex; gap: 8px; margin-left: 22px; margin-top: 4px;
+        }
+        .response-radio-inline .form-check {
+            margin: 0; padding-left: 18px;
+        }
+        .response-radio-inline .form-check-input { width: 12px; height: 12px; }
+        .response-radio-inline .form-check-label {
+            font-size: 10px; margin-left: 2px;
+        }
+        .response-radio-inline .form-check-label.text-success { color: #198754 !important; }
+        .response-radio-inline .form-check-label.text-warning { color: #ffc107 !important; }
+        .response-radio-inline .form-check-label.text-danger { color: #dc3545 !important; }
+
+        /* Navegação */
+        .nav-btn-group { display: flex; gap: 8px; align-items: center; }
+        .nav-btn-group .btn { font-size: 11px; padding: 4px 10px; }
+        .nav-btn-group .nav-id { font-size: 10px; color: #666; }
+
+        /* Alerta ciência */
+        .alert-ciencia {
+            background: #ffebee; border: 1px solid #f44336; color: #c62828;
+            padding: 6px 10px; border-radius: 6px; margin-bottom: 8px;
+            font-size: 11px; font-weight: 500;
+        }
+        .alert-ciencia i { margin-right: 5px; }
+        .titulo-sem-ciencia { color: #dc3545 !important; }
     </style>
 </head>
 <body>
@@ -329,29 +392,67 @@ function isValidScript($script) {
     <div class="container-fluid py-2">
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <div>
-                <a href="<?= $base_url ?>/index" class="text-decoration-none text-muted small">
-                    <i class="bi bi-arrow-left"></i> Voltar
-                </a>
-                <h5 class="mb-0 mt-1" style="font-size: 16px;">
-                    <i class="bi bi-ticket-perforated"></i>
-                    Título: <strong id="tituloId"><?= htmlspecialchars($titulo['numero_titulo']) ?></strong>
-                    <button class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" onclick="copiarTexto('<?= htmlspecialchars($titulo['numero_titulo']) ?>')" title="Copiar ID">
-                        <i class="bi bi-clipboard" style="font-size: 12px;"></i>
-                    </button>
-                </h5>
+            <div class="d-flex align-items-center gap-3">
+                <div>
+                    <a href="<?= $base_url ?>/index" class="text-decoration-none text-muted small">
+                        <i class="bi bi-arrow-left"></i> Voltar
+                    </a>
+                    <h5 class="mb-0 mt-1 <?= $sem_ciencia_titulo ? 'titulo-sem-ciencia' : '' ?>" style="font-size: 16px;">
+                        <i class="bi bi-ticket-perforated"></i>
+                        Título: <strong id="tituloId"><?= htmlspecialchars($titulo['numero_titulo']) ?></strong>
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" onclick="copiarTexto('<?= htmlspecialchars($titulo['numero_titulo']) ?>')" title="Copiar ID">
+                            <i class="bi bi-clipboard" style="font-size: 12px;"></i>
+                        </button>
+                    </h5>
+                </div>
+                <!-- Navegação -->
+                <div class="nav-btn-group">
+                    <?php if ($titulo_anterior): ?>
+                    <a href="<?= $base_url ?>/titulo?id=<?= urlencode($titulo_anterior['numero_titulo']) ?>" class="btn btn-outline-secondary btn-sm" title="Anterior: <?= htmlspecialchars($titulo_anterior['numero_titulo']) ?>">
+                        <i class="bi bi-chevron-left"></i>
+                        <span class="nav-id"><?= htmlspecialchars($titulo_anterior['numero_titulo']) ?></span>
+                    </a>
+                    <?php else: ?>
+                    <button class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-chevron-left"></i></button>
+                    <?php endif; ?>
+                    <?php if ($titulo_proximo): ?>
+                    <a href="<?= $base_url ?>/titulo?id=<?= urlencode($titulo_proximo['numero_titulo']) ?>" class="btn btn-outline-secondary btn-sm" title="Próximo: <?= htmlspecialchars($titulo_proximo['numero_titulo']) ?>">
+                        <span class="nav-id"><?= htmlspecialchars($titulo_proximo['numero_titulo']) ?></span>
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                    <?php else: ?>
+                    <button class="btn btn-outline-secondary btn-sm" disabled><i class="bi bi-chevron-right"></i></button>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="d-flex gap-2">
-                <span class="badge <?= $titulo['status'] === 'concluido' ? 'bg-success' : ($titulo['status'] === 'em_andamento' ? 'bg-warning' : 'bg-danger') ?>" style="font-size: 12px; padding: 6px 12px;">
+                <span class="badge <?= $titulo['status'] === 'concluido' ? 'bg-success' : ($titulo['status'] === 'em_andamento' ? 'bg-warning text-dark' : 'bg-danger') ?>" style="font-size: 12px; padding: 6px 12px;">
                     <?= ucfirst(str_replace('_', ' ', $titulo['status'])) ?>
                 </span>
                 <?php if ($titulo['status'] !== 'concluido'): ?>
+                    <?php if ($titulo['status'] !== 'pendente'): ?>
+                    <button class="btn btn-warning btn-sm" onclick="marcarPendente()">
+                        <i class="bi bi-clock"></i> Pendente
+                    </button>
+                    <?php endif; ?>
+                    <?php if ($titulo['status'] === 'pendente'): ?>
+                    <button class="btn btn-info btn-sm text-white" onclick="iniciarAtendimento()">
+                        <i class="bi bi-play-fill"></i> Iniciar
+                    </button>
+                    <?php endif; ?>
                 <button class="btn btn-success btn-sm" onclick="concluirAtendimento()">
                     <i class="bi bi-check-lg"></i> Concluir
                 </button>
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php if ($sem_ciencia_titulo): ?>
+        <div class="alert-ciencia">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <strong>ATENÇÃO:</strong> Cliente não tem ciência do título! Verificar situação com o consultor.
+        </div>
+        <?php endif; ?>
 
         <!-- Progress & Satisfaction Row -->
         <div class="row g-2 mb-2">
@@ -451,7 +552,24 @@ function isValidScript($script) {
                         </div>
                         <div class="info-item">
                             <div class="info-label">E-mail</div>
-                            <div class="info-value"><?= htmlspecialchars($titulo['email'] ?? '-') ?></div>
+                            <div class="info-value">
+                                <?php if (!empty($titulo['email'])): ?>
+                                <a href="mailto:<?= htmlspecialchars($titulo['email'] ?? '') ?>" class="text-decoration-none">
+                                    <?= htmlspecialchars($titulo['email']) ?>
+                                </a>
+                                <button class="btn btn-sm btn-outline-success py-0 px-1 ms-1" onclick="copiarTexto('<?= htmlspecialchars($titulo['email'] ?? '') ?>')" title="Copiar">
+                                    <i class="bi bi-clipboard" style="font-size: 10px;"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary py-0 px-1 ms-1" data-bs-toggle="modal" data-bs-target="#modalEmail" title="Editar">
+                                    <i class="bi bi-pencil" style="font-size: 10px;"></i>
+                                </button>
+                                <?php else: ?>
+                                <span class="text-muted">-</span>
+                                <button class="btn btn-sm btn-warning py-0 px-2 ms-1" data-bs-toggle="modal" data-bs-target="#modalEmail">
+                                    <i class="bi bi-plus"></i> Adicionar
+                                </button>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">Data Venda</div>
@@ -579,6 +697,20 @@ function isValidScript($script) {
                                 $script = substituirVars($etapa['script_template'], $titulo, $configs);
                                 $opcoes = $etapa['opcoes_campo'] ? json_decode($etapa['opcoes_campo'], true) : [];
                             ?>
+                            <?php
+                                // Determinar resposta atual do item
+                                $resposta_item = '';
+                                if (isset($interacoes[$etapa['codigo']])) {
+                                    $vt = $interacoes[$etapa['codigo']]['valor_texto'] ?? '';
+                                    if (in_array($vt, ['Positivo', 'Sim', 'Sim, confirmado', 'Sim, correto'])) {
+                                        $resposta_item = 'Positivo';
+                                    } elseif (in_array($vt, ['Negativo', 'Não', 'Dados incorretos', 'Não, corrigido'])) {
+                                        $resposta_item = 'Negativo';
+                                    } elseif ($vt === 'Neutro') {
+                                        $resposta_item = 'Neutro';
+                                    }
+                                }
+                            ?>
                             <div class="checklist-item <?= $val_cb ? 'completed' : '' ?>" data-codigo="<?= $etapa['codigo'] ?>" data-search="<?= strtolower(htmlspecialchars($etapa['titulo'] . ' ' . ($etapa['descricao'] ?? ''))) ?>">
                                 <div class="form-check">
                                     <input class="form-check-input checklist-checkbox" type="checkbox"
@@ -590,6 +722,37 @@ function isValidScript($script) {
                                     </label>
                                     <span class="saving-indicator" id="saving_<?= $etapa['codigo'] ?>"><i class="bi bi-arrow-repeat spin"></i></span>
                                     <span class="saved-indicator" id="saved_<?= $etapa['codigo'] ?>"><i class="bi bi-check"></i></span>
+                                </div>
+
+                                <!-- Response Radio: Positivo/Neutro/Negativo -->
+                                <div class="response-radio-inline">
+                                    <div class="form-check">
+                                        <input class="form-check-input response-radio" type="radio"
+                                               name="resp_<?= $etapa['codigo'] ?>" id="resp_pos_<?= $etapa['codigo'] ?>"
+                                               value="Positivo" data-codigo="<?= $etapa['codigo'] ?>"
+                                               <?= $resposta_item === 'Positivo' ? 'checked' : '' ?>>
+                                        <label class="form-check-label text-success" for="resp_pos_<?= $etapa['codigo'] ?>">
+                                            <i class="bi bi-emoji-smile"></i> +
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input response-radio" type="radio"
+                                               name="resp_<?= $etapa['codigo'] ?>" id="resp_neu_<?= $etapa['codigo'] ?>"
+                                               value="Neutro" data-codigo="<?= $etapa['codigo'] ?>"
+                                               <?= $resposta_item === 'Neutro' ? 'checked' : '' ?>>
+                                        <label class="form-check-label text-warning" for="resp_neu_<?= $etapa['codigo'] ?>">
+                                            <i class="bi bi-emoji-neutral"></i> ~
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input response-radio" type="radio"
+                                               name="resp_<?= $etapa['codigo'] ?>" id="resp_neg_<?= $etapa['codigo'] ?>"
+                                               value="Negativo" data-codigo="<?= $etapa['codigo'] ?>"
+                                               <?= $resposta_item === 'Negativo' ? 'checked' : '' ?>>
+                                        <label class="form-check-label text-danger" for="resp_neg_<?= $etapa['codigo'] ?>">
+                                            <i class="bi bi-emoji-frown"></i> -
+                                        </label>
+                                    </div>
                                 </div>
 
                                 <?php if ($etapa['descricao']): ?>
@@ -721,6 +884,14 @@ function isValidScript($script) {
                             $val_txt = isset($interacoes[$etapa['codigo']]) ? ($interacoes[$etapa['codigo']]['valor_texto'] ?? '') : '';
                             $val_num = isset($interacoes[$etapa['codigo']]) ? ($interacoes[$etapa['codigo']]['valor_numero'] ?? '') : '';
                             $opcoes = $etapa['opcoes_campo'] ? json_decode($etapa['opcoes_campo'], true) : [];
+                            // Determinar resposta atual
+                            $resposta_reg = '';
+                            if (isset($interacoes[$etapa['codigo']])) {
+                                $vtr = $interacoes[$etapa['codigo']]['valor_texto'] ?? '';
+                                if (in_array($vtr, ['Positivo', 'Sim', 'Sim, confirmado', 'Sim, correto'])) $resposta_reg = 'Positivo';
+                                elseif (in_array($vtr, ['Negativo', 'Não', 'Dados incorretos', 'Não, corrigido'])) $resposta_reg = 'Negativo';
+                                elseif ($vtr === 'Neutro') $resposta_reg = 'Neutro';
+                            }
                         ?>
                         <div class="checklist-item <?= $val_cb ? 'completed' : '' ?>" data-codigo="<?= $etapa['codigo'] ?>" style="padding: 6px;">
                             <div class="form-check">
@@ -733,6 +904,22 @@ function isValidScript($script) {
                                 </label>
                                 <span class="saving-indicator" id="saving_<?= $etapa['codigo'] ?>"><i class="bi bi-arrow-repeat spin"></i></span>
                                 <span class="saved-indicator" id="saved_<?= $etapa['codigo'] ?>"><i class="bi bi-check"></i></span>
+                            </div>
+
+                            <!-- Response Radio para registro -->
+                            <div class="response-radio-inline" style="margin-left: 18px;">
+                                <div class="form-check">
+                                    <input class="form-check-input response-radio" type="radio" name="resp_<?= $etapa['codigo'] ?>" value="Positivo" data-codigo="<?= $etapa['codigo'] ?>" <?= $resposta_reg === 'Positivo' ? 'checked' : '' ?>>
+                                    <label class="form-check-label text-success"><i class="bi bi-emoji-smile"></i></label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input response-radio" type="radio" name="resp_<?= $etapa['codigo'] ?>" value="Neutro" data-codigo="<?= $etapa['codigo'] ?>" <?= $resposta_reg === 'Neutro' ? 'checked' : '' ?>>
+                                    <label class="form-check-label text-warning"><i class="bi bi-emoji-neutral"></i></label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input response-radio" type="radio" name="resp_<?= $etapa['codigo'] ?>" value="Negativo" data-codigo="<?= $etapa['codigo'] ?>" <?= $resposta_reg === 'Negativo' ? 'checked' : '' ?>>
+                                    <label class="form-check-label text-danger"><i class="bi bi-emoji-frown"></i></label>
+                                </div>
                             </div>
 
                             <?php if ($etapa['tipo_campo'] === 'select' && isset($opcoes['opcoes'])): ?>
@@ -780,6 +967,42 @@ function isValidScript($script) {
                 </div>
                 <?php endif; ?>
 
+                <!-- Feedback do Atendente Boas-Vindas -->
+                <div class="card-info">
+                    <div class="card-header"><h6><i class="bi bi-chat-heart"></i> Feedback Boas-Vindas</h6></div>
+                    <div class="card-body p-2">
+                        <div class="mb-2">
+                            <label class="form-label small mb-1">Sua avaliação do atendimento</label>
+                            <div class="rating-stars" id="rating_atendente_bv">
+                                <?php
+                                $nota_atend_bv = $titulo['nota_atendimento_bv'] ?? 0;
+                                for ($i = 1; $i <= 5; $i++): ?>
+                                <i class="bi bi-star-fill <?= $i <= $nota_atend_bv ? 'active' : '' ?>" data-value="<?= $i ?>" style="font-size: 18px; cursor: pointer;"></i>
+                                <?php endfor; ?>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1">Feedback do atendimento</label>
+                            <textarea class="form-control form-control-sm" id="feedback_atendente_bv" rows="2" placeholder="Como foi a ligação? Cliente receptivo? Dificuldades?" style="font-size: 11px;"><?= htmlspecialchars($titulo['feedback_atendente_bv'] ?? '') ?></textarea>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label small mb-1">Classificação geral</label>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <?php
+                                $classif_bv = $titulo['classificacao_bv'] ?? '';
+                                $classifs = ['Excelente' => 'success', 'Bom' => 'primary', 'Regular' => 'warning', 'Difícil' => 'danger'];
+                                foreach ($classifs as $label => $color): ?>
+                                <div class="form-check">
+                                    <input class="form-check-input classif-bv-radio" type="radio" name="classif_bv" id="classif_<?= strtolower($label) ?>" value="<?= $label ?>" <?= $classif_bv === $label ? 'checked' : '' ?>>
+                                    <label class="form-check-label text-<?= $color ?>" for="classif_<?= strtolower($label) ?>" style="font-size: 11px;"><?= $label ?></label>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <small class="text-muted" id="feedback_bv_status" style="font-size: 10px;"></small>
+                    </div>
+                </div>
+
                 <!-- Observações Gerais -->
                 <div class="card-info">
                     <div class="card-header"><h6><i class="bi bi-journal-text"></i> Observações Gerais</h6></div>
@@ -809,6 +1032,30 @@ function isValidScript($script) {
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary btn-sm" onclick="salvarTelefone()">
+                        <i class="bi bi-save"></i> Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Email -->
+    <div class="modal fade" id="modalEmail" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-envelope"></i> E-mail</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">E-mail</label>
+                        <input type="email" class="form-control" id="input_email" value="<?= htmlspecialchars($titulo['email'] ?? '') ?>" placeholder="email@exemplo.com">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="salvarEmail()">
                         <i class="bi bi-save"></i> Salvar
                     </button>
                 </div>
@@ -1144,6 +1391,110 @@ function isValidScript($script) {
             scoreEl.className = 'satisfaction-score ' + (score >= 70 ? 'text-success' : (score >= 40 ? 'text-warning' : 'text-danger'));
         }
         if (needleEl) needleEl.style.transform = 'rotate(' + ((score - 50) * 1.8) + 'deg)';
+    }
+
+    // Salvar email
+    function salvarEmail() {
+        const email = document.getElementById('input_email').value;
+        $.ajax({
+            url: baseUrl + '/api_salvar_boasvindas.php',
+            method: 'POST',
+            data: { id: boasVindasId, email: email },
+            success: function(response) {
+                if (response.success) {
+                    showToast('E-mail salvo!');
+                    bootstrap.Modal.getInstance(document.getElementById('modalEmail')).hide();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    showToast('Erro: ' + response.error, 'danger');
+                }
+            },
+            error: () => showToast('Erro ao salvar', 'danger')
+        });
+    }
+
+    // Marcar como pendente
+    function marcarPendente() {
+        if (!confirm('Marcar este atendimento como pendente?')) return;
+        $.ajax({
+            url: baseUrl + '/api_salvar_boasvindas.php',
+            method: 'POST',
+            data: { id: boasVindasId, status: 'pendente' },
+            success: () => { showToast('Marcado como pendente!'); setTimeout(() => location.reload(), 500); },
+            error: () => showToast('Erro', 'danger')
+        });
+    }
+
+    // Iniciar atendimento
+    function iniciarAtendimento() {
+        $.ajax({
+            url: baseUrl + '/api_salvar_boasvindas.php',
+            method: 'POST',
+            data: { id: boasVindasId, status: 'em_andamento' },
+            success: () => { showToast('Atendimento iniciado!'); setTimeout(() => location.reload(), 500); },
+            error: () => showToast('Erro', 'danger')
+        });
+    }
+
+    // Response radio handlers (Positivo/Neutro/Negativo para cada item)
+    document.querySelectorAll('.response-radio').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const codigo = this.dataset.codigo;
+            const valor = this.value;
+            // Marcar checkbox automaticamente
+            const cb = document.getElementById('check_' + codigo);
+            if (cb && !cb.checked) {
+                cb.checked = true;
+                salvarInteracao(codigo, 1, valor, null);
+            } else {
+                salvarInteracao(codigo, null, valor, null);
+            }
+            // Atualizar satisfação
+            atualizarSatisfacao(valor);
+        });
+    });
+
+    // Feedback atendente boas-vindas
+    document.getElementById('rating_atendente_bv').querySelectorAll('i').forEach(star => {
+        star.addEventListener('click', function() {
+            const val = this.dataset.value;
+            this.parentElement.querySelectorAll('i').forEach((s, i) => {
+                s.classList.toggle('active', i < val);
+            });
+            salvarFeedbackBV();
+        });
+    });
+
+    document.getElementById('feedback_atendente_bv').addEventListener('blur', function() {
+        salvarFeedbackBV();
+    });
+
+    document.querySelectorAll('.classif-bv-radio').forEach(radio => {
+        radio.addEventListener('change', function() {
+            salvarFeedbackBV();
+        });
+    });
+
+    function salvarFeedbackBV() {
+        const status = document.getElementById('feedback_bv_status');
+        status.textContent = 'Salvando...';
+
+        const nota = document.querySelectorAll('#rating_atendente_bv i.active').length;
+        const feedback = document.getElementById('feedback_atendente_bv').value;
+        const classif = document.querySelector('.classif-bv-radio:checked')?.value || '';
+
+        $.ajax({
+            url: baseUrl + '/api_salvar_boasvindas.php',
+            method: 'POST',
+            data: {
+                id: boasVindasId,
+                nota_atendimento_bv: nota,
+                feedback_atendente_bv: feedback,
+                classificacao_bv: classif
+            },
+            success: () => { status.textContent = 'Salvo!'; setTimeout(() => status.textContent = '', 2000); },
+            error: () => status.textContent = 'Erro ao salvar'
+        });
     }
     </script>
 </body>

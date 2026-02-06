@@ -27,7 +27,8 @@ try {
         'acessou_portal', 'resetou_senha', 'feedback_consultor',
         'nota_atendimento_consultor', 'problema_pagamento_entrada',
         'sabia_anuidade', 'agendou_primeira_visita', 'data_agendamento',
-        'adicionou_grupo_whatsapp', 'enviou_resumo_whatsapp'
+        'adicionou_grupo_whatsapp', 'enviou_resumo_whatsapp',
+        'nota_atendimento_bv', 'feedback_atendente_bv', 'classificacao_bv'
     ];
 
     $updates = [];

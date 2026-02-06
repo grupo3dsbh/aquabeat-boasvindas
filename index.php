@@ -250,6 +250,15 @@ $em_andamento = $stmt_andamento->fetchAll();
             </div>
         </div>
 
+        <!-- Botão de Atualização em Massa -->
+        <div class="row mb-3">
+            <div class="col-12 text-end">
+                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalBulk">
+                    <i class="bi bi-collection"></i> Atualização em Massa
+                </button>
+            </div>
+        </div>
+
         <!-- Cards de Estatisticas -->
         <div class="row mb-4">
             <div class="col-md-4">
@@ -422,12 +431,25 @@ $em_andamento = $stmt_andamento->fetchAll();
                         </a>
                     </div>
 
+                    <div id="vendas_info" class="d-flex justify-content-between align-items-center mb-2" style="display: none !important;">
+                        <small class="text-muted"><span id="vendas_count">0</span> de <span id="vendas_total">0</span> atendimentos</small>
+                    </div>
+
                     <div id="listaVendas">
                         <div class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Carregando...</span>
                             </div>
                             <p class="mt-2 text-muted">Carregando vendas...</p>
+                        </div>
+                    </div>
+
+                    <div id="paginacao_vendas" class="text-center mt-3" style="display: none;">
+                        <button class="btn btn-outline-primary btn-sm" id="btnCarregarMais" onclick="carregarMaisVendas()">
+                            <i class="bi bi-arrow-down-circle"></i> Carregar mais
+                        </button>
+                        <div class="text-muted small mt-1">
+                            Página <span id="pagina_atual">1</span> de <span id="total_paginas">1</span>
                         </div>
                     </div>
                 </div>
@@ -466,6 +488,72 @@ $em_andamento = $stmt_andamento->fetchAll();
         </div>
     </div>
 
+    <!-- Modal Atualização em Massa -->
+    <div class="modal fade" id="modalBulk" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-collection"></i> Atualização em Massa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Cole os IDs dos títulos (um por linha ou separados por espaço/vírgula)</label>
+                        <textarea class="form-control" id="bulk_ids" rows="5" placeholder="SFA-11057&#10;SFA-11039&#10;SFA-11046&#10;ou: SFA-11057, SFA-11039, SFA-11046"></textarea>
+                        <small class="text-muted"><span id="bulk_count">0</span> títulos identificados</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ação a executar</label>
+                        <select class="form-select" id="bulk_action">
+                            <option value="">Selecione a ação...</option>
+                            <option value="concluir">✅ Concluir atendimentos</option>
+                            <option value="pendente">⏸️ Marcar como pendente</option>
+                            <option value="em_andamento">▶️ Marcar como em andamento</option>
+                            <option value="marcar_item">📋 Marcar item do checklist</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="bulk_item_options" style="display: none;">
+                        <label class="form-label">Item do checklist</label>
+                        <select class="form-select" id="bulk_item_codigo">
+                            <option value="">Selecione o item...</option>
+                            <option value="abert_cumprimentar">Cumprimentou o cliente</option>
+                            <option value="valid_confirmar_cpf">Confirmou CPF</option>
+                            <option value="portal_informar">Informou sobre o portal</option>
+                            <option value="financ_explicou_anuidade">Explicou anuidade</option>
+                            <option value="encerr_despedida">Despediu-se do cliente</option>
+                        </select>
+                        <div class="mt-2">
+                            <label class="form-label">Resposta do item</label>
+                            <div class="d-flex gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_resposta" id="bulk_resp_pos" value="Positivo" checked>
+                                    <label class="form-check-label text-success" for="bulk_resp_pos"><i class="bi bi-emoji-smile"></i> Positivo</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_resposta" id="bulk_resp_neu" value="Neutro">
+                                    <label class="form-check-label text-warning" for="bulk_resp_neu"><i class="bi bi-emoji-neutral"></i> Neutro</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="bulk_resposta" id="bulk_resp_neg" value="Negativo">
+                                    <label class="form-check-label text-danger" for="bulk_resp_neg"><i class="bi bi-emoji-frown"></i> Negativo</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="bulk_preview" class="alert alert-info" style="display: none;">
+                        <i class="bi bi-info-circle"></i> <span id="bulk_preview_text"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnExecutarBulk" onclick="executarBulk()">
+                        <i class="bi bi-lightning"></i> Executar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -473,6 +561,9 @@ $em_andamento = $stmt_andamento->fetchAll();
     const dataInicio = '<?= $data_inicio ?>';
     const dataFim = '<?= $data_fim ?>';
     let filtroStatusVendas = '<?= $filtro_status_vendas ?>';
+    let paginaAtual = 1;
+    let totalPaginas = 1;
+    let vendasCarregadas = [];
 
     $(document).ready(function() {
         carregarVendas();
@@ -535,19 +626,25 @@ $em_andamento = $stmt_andamento->fetchAll();
 
     function filtrarVendas(status) {
         filtroStatusVendas = status;
+        paginaAtual = 1;
+        vendasCarregadas = [];
         // Update active class
         $('.filter-tabs a[onclick*="filtrarVendas"]').removeClass('active');
         $(`.filter-tabs a[onclick*="filtrarVendas('${status}')"]`).addClass('active');
         carregarVendas();
     }
 
-    function carregarVendas() {
-        $('#listaVendas').html(`
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-2 text-muted">Carregando vendas...</p>
-            </div>
-        `);
+    function carregarVendas(append = false) {
+        if (!append) {
+            $('#listaVendas').html(`
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Carregando vendas...</p>
+                </div>
+            `);
+        } else {
+            $('#btnCarregarMais').prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Carregando...');
+        }
 
         $.ajax({
             url: 'api_vendas.php',
@@ -555,11 +652,38 @@ $em_andamento = $stmt_andamento->fetchAll();
             data: {
                 data_inicio: dataInicio,
                 data_fim: dataFim,
-                status: filtroStatusVendas
+                status: filtroStatusVendas,
+                pagina: paginaAtual,
+                por_pagina: 50
             },
             success: function(response) {
                 if (response.success) {
-                    renderizarVendas(response.data);
+                    totalPaginas = response.total_paginas || 1;
+
+                    // Atualizar contadores
+                    $('#vendas_count').text(Math.min(paginaAtual * 50, response.total));
+                    $('#vendas_total').text(response.total);
+                    $('#vendas_info').css('display', 'flex');
+
+                    // Atualizar paginação
+                    $('#pagina_atual').text(paginaAtual);
+                    $('#total_paginas').text(totalPaginas);
+
+                    if (append) {
+                        vendasCarregadas = vendasCarregadas.concat(response.data);
+                        renderizarVendas(vendasCarregadas);
+                    } else {
+                        vendasCarregadas = response.data;
+                        renderizarVendas(response.data);
+                    }
+
+                    // Mostrar/esconder botão de carregar mais
+                    if (paginaAtual < totalPaginas) {
+                        $('#paginacao_vendas').show();
+                        $('#btnCarregarMais').prop('disabled', false).html('<i class="bi bi-arrow-down-circle"></i> Carregar mais');
+                    } else {
+                        $('#paginacao_vendas').hide();
+                    }
                 } else {
                     $('#listaVendas').html('<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ' + response.error + '</div>');
                 }
@@ -571,8 +695,14 @@ $em_andamento = $stmt_andamento->fetchAll();
                     if (resp.error) msg = resp.error;
                 } catch(e) {}
                 $('#listaVendas').html('<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> ' + msg + '</div>');
+                $('#btnCarregarMais').prop('disabled', false).html('<i class="bi bi-arrow-down-circle"></i> Carregar mais');
             }
         });
+    }
+
+    function carregarMaisVendas() {
+        paginaAtual++;
+        carregarVendas(true);
     }
 
     function renderizarVendas(vendas) {
@@ -653,6 +783,115 @@ $em_andamento = $stmt_andamento->fetchAll();
     function formatarMoeda(valor) {
         if (!valor) return 'R$ 0,00';
         return 'R$ ' + parseFloat(valor).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    // Bulk Update Functions
+    $('#bulk_ids').on('input', function() {
+        const ids = parseBulkIds($(this).val());
+        $('#bulk_count').text(ids.length);
+        atualizarPreviewBulk();
+    });
+
+    $('#bulk_action').on('change', function() {
+        const action = $(this).val();
+        if (action === 'marcar_item') {
+            $('#bulk_item_options').show();
+        } else {
+            $('#bulk_item_options').hide();
+        }
+        atualizarPreviewBulk();
+    });
+
+    function parseBulkIds(text) {
+        if (!text) return [];
+        // Separar por vírgula, espaço ou nova linha
+        const ids = text.split(/[\s,\n]+/).filter(id => id.trim().length > 0);
+        return [...new Set(ids)]; // Remove duplicatas
+    }
+
+    function atualizarPreviewBulk() {
+        const ids = parseBulkIds($('#bulk_ids').val());
+        const action = $('#bulk_action').val();
+
+        if (ids.length === 0 || !action) {
+            $('#bulk_preview').hide();
+            return;
+        }
+
+        let actionText = '';
+        switch(action) {
+            case 'concluir': actionText = 'concluir'; break;
+            case 'pendente': actionText = 'marcar como pendente'; break;
+            case 'em_andamento': actionText = 'marcar como em andamento'; break;
+            case 'marcar_item':
+                const item = $('#bulk_item_codigo option:selected').text();
+                const resposta = $('input[name="bulk_resposta"]:checked').val();
+                actionText = `marcar "${item}" como ${resposta}`;
+                break;
+        }
+
+        $('#bulk_preview_text').text(`Você irá ${actionText} em ${ids.length} título(s)`);
+        $('#bulk_preview').show();
+    }
+
+    function executarBulk() {
+        const ids = parseBulkIds($('#bulk_ids').val());
+        const action = $('#bulk_action').val();
+
+        if (ids.length === 0) {
+            alert('Cole pelo menos um ID de título!');
+            return;
+        }
+
+        if (!action) {
+            alert('Selecione a ação a executar!');
+            return;
+        }
+
+        const data = {
+            ids: ids,
+            action: action
+        };
+
+        if (action === 'marcar_item') {
+            const itemCodigo = $('#bulk_item_codigo').val();
+            const resposta = $('input[name="bulk_resposta"]:checked').val();
+
+            if (!itemCodigo) {
+                alert('Selecione o item do checklist!');
+                return;
+            }
+
+            data.item_codigo = itemCodigo;
+            data.resposta = resposta;
+        }
+
+        if (!confirm(`Confirma a execução em ${ids.length} título(s)?`)) {
+            return;
+        }
+
+        $('#btnExecutarBulk').prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Processando...');
+
+        $.ajax({
+            url: 'api_bulk_update.php',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(response) {
+                if (response.success) {
+                    alert(`Operação concluída!\n\n${response.processados} título(s) processado(s)\n${response.erros} erro(s)`);
+                    bootstrap.Modal.getInstance(document.getElementById('modalBulk')).hide();
+                    location.reload();
+                } else {
+                    alert('Erro: ' + response.error);
+                }
+                $('#btnExecutarBulk').prop('disabled', false).html('<i class="bi bi-lightning"></i> Executar');
+            },
+            error: function() {
+                alert('Erro ao processar a requisição');
+                $('#btnExecutarBulk').prop('disabled', false).html('<i class="bi bi-lightning"></i> Executar');
+            }
+        });
     }
     </script>
 </body>
