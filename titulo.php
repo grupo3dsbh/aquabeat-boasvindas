@@ -198,10 +198,15 @@ try {
 // Verificar se cliente tem ciência do título (flag para alerta vermelho)
 $sem_ciencia_titulo = false;
 try {
-    if (isset($interacoes['valid_cliente_ciente'])) {
-        $val = $interacoes['valid_cliente_ciente']['valor_texto'] ?? '';
-        if (in_array($val, ['Não', 'Negativo', 'Não, corrigido'])) {
-            $sem_ciencia_titulo = true;
+    // Verificar resposta antiga (valid_cliente_ciente) ou nova (valid_ciencia_cota)
+    $codigos_ciencia = ['valid_cliente_ciente', 'valid_ciencia_cota'];
+    foreach ($codigos_ciencia as $codigo) {
+        if (isset($interacoes[$codigo])) {
+            $val = $interacoes[$codigo]['valor_texto'] ?? '';
+            if (in_array($val, ['Não', 'Negativo', 'Não, corrigido', 'Não tinha ciência', 'Ficou com dúvida'])) {
+                $sem_ciencia_titulo = true;
+                break;
+            }
         }
     }
 } catch (Exception $e) {}
@@ -250,11 +255,11 @@ foreach ($etapas as $e) {
         $val_txt = $interacoes[$e['codigo']]['valor_texto'] ?? '';
         $val_num = $interacoes[$e['codigo']]['valor_numero'] ?? 0;
 
-        if (in_array($val_txt, ['Positivo', 'Sim', 'Sim, confirmado', 'Sim, correto'])) {
+        if (in_array($val_txt, ['Positivo', 'Sim', 'Sim, confirmado', 'Sim, correto', 'Sim, tem ciência'])) {
             $satisfacao_positiva++;
-        } elseif (in_array($val_txt, ['Negativo', 'Não', 'Dados incorretos', 'Não, corrigido'])) {
+        } elseif (in_array($val_txt, ['Negativo', 'Não', 'Dados incorretos', 'Não, corrigido', 'Não tinha ciência'])) {
             $satisfacao_negativa++;
-        } elseif ($val_txt === 'Neutro') {
+        } elseif (in_array($val_txt, ['Neutro', 'Ficou com dúvida'])) {
             $satisfacao_neutra++;
         }
 
@@ -265,7 +270,32 @@ foreach ($etapas as $e) {
 }
 $progresso = $total_obrig > 0 ? round(($completos_obrig / $total_obrig) * 100) : 0;
 $total_respostas = $satisfacao_positiva + $satisfacao_negativa + $satisfacao_neutra;
-$satisfacao_score = $total_respostas > 0 ? round(($satisfacao_positiva / $total_respostas) * 100) : 0;
+$satisfacao_base = $total_respostas > 0 ? ($satisfacao_positiva / $total_respostas) * 100 : 0;
+
+// Incluir notas do consultor e atendimento na temperatura de satisfação
+$nota_atend_bv = $titulo['nota_atendimento_bv'] ?? 0;
+$nota_consultor_score = $nota_consultor > 0 ? ($nota_consultor / 5) * 100 : 0;
+$nota_atend_score = $nota_atend_bv > 0 ? ($nota_atend_bv / 5) * 100 : 0;
+
+// Calcular score combinado: respostas (60%) + consultor (20%) + atendimento (20%)
+$componentes = 0;
+$soma_score = 0;
+
+if ($total_respostas > 0) {
+    $soma_score += $satisfacao_base * 0.6;
+    $componentes += 0.6;
+}
+if ($nota_consultor > 0) {
+    $soma_score += $nota_consultor_score * 0.2;
+    $componentes += 0.2;
+}
+if ($nota_atend_bv > 0) {
+    $soma_score += $nota_atend_score * 0.2;
+    $componentes += 0.2;
+}
+
+// Normalizar para o total de componentes disponíveis
+$satisfacao_score = $componentes > 0 ? round($soma_score / $componentes) : 0;
 
 // Função para substituir variáveis
 function substituirVars($tpl, $titulo, $configs) {
@@ -520,6 +550,33 @@ function isValidScript($script) {
                     </div>
                     <small class="text-muted" style="font-size: 10px;"><?= $completos_obrig ?> de <?= $total_obrig ?> obrigatórios</small>
                 </div>
+
+                <?php if ($precisa_followup && $titulo['status'] !== 'concluido'): ?>
+                <!-- Alerta de Follow-up (abaixo do progresso apenas) -->
+                <div class="alert alert-warning d-flex align-items-center justify-content-between py-2 mt-2 mb-0" style="font-size: 11px;">
+                    <div>
+                        <i class="bi bi-bell-fill me-1"></i>
+                        <strong>Nova tentativa!</strong>
+                        <?= ucfirst(str_replace('_', ' ', $ultima_tentativa['resultado'])) ?>
+                        há <?= $horas_desde_ultima ?>h
+                    </div>
+                    <div class="d-flex gap-1">
+                        <?php if (!empty($titulo['telefone'])): ?>
+                        <a href="tel:<?= preg_replace('/[^0-9]/', '', $titulo['telefone']) ?>" class="btn btn-sm btn-outline-primary py-0 px-1 <?= $sugestao_contato === 'telefone' ? 'btn-primary text-white' : '' ?>" style="font-size: 10px;">
+                            <i class="bi bi-telephone"></i>
+                        </a>
+                        <a href="https://wa.me/55<?= preg_replace('/[^0-9]/', '', $titulo['telefone']) ?>" target="_blank" class="btn btn-sm btn-outline-success py-0 px-1 <?= $sugestao_contato === 'whatsapp' ? 'btn-success text-white' : '' ?>" style="font-size: 10px;">
+                            <i class="bi bi-whatsapp"></i>
+                        </a>
+                        <?php endif; ?>
+                        <?php if (!empty($titulo['email'])): ?>
+                        <a href="mailto:<?= htmlspecialchars($titulo['email']) ?>" class="btn btn-sm btn-outline-info py-0 px-1 <?= $sugestao_contato === 'email' ? 'btn-info text-white' : '' ?>" style="font-size: 10px;">
+                            <i class="bi bi-envelope"></i>
+                        </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="col-md-6">
                 <div class="satisfaction-card">
@@ -581,33 +638,6 @@ function isValidScript($script) {
                 </div>
             </div>
         </div>
-
-        <?php if ($precisa_followup && $titulo['status'] !== 'concluido'): ?>
-        <!-- Alerta de Follow-up -->
-        <div class="alert alert-warning d-flex align-items-center justify-content-between py-2 mb-2" style="font-size: 12px;">
-            <div>
-                <i class="bi bi-bell-fill me-2"></i>
-                <strong>Nova tentativa necessária!</strong>
-                Última tentativa: <?= ucfirst(str_replace('_', ' ', $ultima_tentativa['resultado'])) ?>
-                há <?= $horas_desde_ultima ?> hora<?= $horas_desde_ultima != 1 ? 's' : '' ?>
-            </div>
-            <div class="d-flex gap-2">
-                <?php if (!empty($titulo['telefone'])): ?>
-                <a href="tel:<?= preg_replace('/[^0-9]/', '', $titulo['telefone']) ?>" class="btn btn-sm btn-outline-primary <?= $sugestao_contato === 'telefone' ? 'btn-primary text-white' : '' ?>">
-                    <i class="bi bi-telephone"></i> Ligar
-                </a>
-                <a href="https://wa.me/55<?= preg_replace('/[^0-9]/', '', $titulo['telefone']) ?>" target="_blank" class="btn btn-sm btn-outline-success <?= $sugestao_contato === 'whatsapp' ? 'btn-success text-white' : '' ?>">
-                    <i class="bi bi-whatsapp"></i> WhatsApp
-                </a>
-                <?php endif; ?>
-                <?php if (!empty($titulo['email'])): ?>
-                <a href="mailto:<?= htmlspecialchars($titulo['email']) ?>" class="btn btn-sm btn-outline-info <?= $sugestao_contato === 'email' ? 'btn-info text-white' : '' ?>">
-                    <i class="bi bi-envelope"></i> E-mail
-                </a>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php endif; ?>
 
         <!-- Main 3-Column Content -->
         <div class="main-container">
