@@ -128,6 +128,28 @@ $usuarios = $stmt->fetchAll();
                             <?php endif; ?>
                         </div>
 
+                        <?php
+                        $perms = json_decode($usuario['permissoes'] ?? '[]', true) ?: [];
+                        if ($usuario['tipo'] === 'atendente' && !empty($perms)):
+                        ?>
+                        <div class="mt-2">
+                            <small class="text-muted d-block mb-1"><i class="bi bi-shield-check"></i> Permissões:</small>
+                            <?php
+                            $perm_labels = [
+                                'editar_pagamento' => 'Pagamentos',
+                                'ver_todos_titulos' => 'Ver Todos',
+                                'concluir_atendimento' => 'Concluir',
+                                'ver_relatorios' => 'Relatórios',
+                                'exportar_dados' => 'Exportar'
+                            ];
+                            foreach ($perms as $p):
+                                $label = $perm_labels[$p] ?? $p;
+                            ?>
+                            <span class="badge bg-secondary me-1 mb-1"><?= htmlspecialchars($label) ?></span>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+
                         <div class="mt-2">
                             <small class="text-muted">
                                 <i class="bi bi-clock"></i> Criado em: <?= formatarData($usuario['criado_em'], 'd/m/Y') ?>
@@ -182,6 +204,53 @@ $usuarios = $stmt->fetchAll();
                                 <label class="form-check-label" for="ativo">
                                     Usuário ativo
                                 </label>
+                            </div>
+                        </div>
+
+                        <!-- Seção de Permissões (só aparece para atendentes) -->
+                        <div class="mb-3" id="secao-permissoes" style="display: none;">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-shield-check"></i> Permissões Especiais
+                            </label>
+                            <div class="alert alert-info py-2 mb-2">
+                                <small><i class="bi bi-info-circle"></i> Administradores têm todas as permissões automaticamente.</small>
+                            </div>
+                            <div class="border rounded p-3 bg-light">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="perm_editar_pagamento" name="permissoes[]" value="editar_pagamento">
+                                    <label class="form-check-label" for="perm_editar_pagamento">
+                                        <strong>Registrar Pagamentos</strong>
+                                        <br><small class="text-muted">Permite registrar pagamentos de parcelas nos títulos</small>
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="perm_ver_todos_titulos" name="permissoes[]" value="ver_todos_titulos">
+                                    <label class="form-check-label" for="perm_ver_todos_titulos">
+                                        <strong>Ver Todos os Títulos</strong>
+                                        <br><small class="text-muted">Permite visualizar títulos de todos os atendentes</small>
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="perm_concluir_atendimento" name="permissoes[]" value="concluir_atendimento">
+                                    <label class="form-check-label" for="perm_concluir_atendimento">
+                                        <strong>Concluir Atendimentos</strong>
+                                        <br><small class="text-muted">Permite marcar atendimentos como concluídos</small>
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="perm_ver_relatorios" name="permissoes[]" value="ver_relatorios">
+                                    <label class="form-check-label" for="perm_ver_relatorios">
+                                        <strong>Ver Relatórios</strong>
+                                        <br><small class="text-muted">Permite acessar página de relatórios</small>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="perm_exportar_dados" name="permissoes[]" value="exportar_dados">
+                                    <label class="form-check-label" for="perm_exportar_dados">
+                                        <strong>Exportar Dados</strong>
+                                        <br><small class="text-muted">Permite exportar dados para Excel/CSV</small>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -262,6 +331,9 @@ $usuarios = $stmt->fetchAll();
 
     $(document).ready(function() {
         modalUsuario = new bootstrap.Modal(document.getElementById('modalUsuario'));
+
+        // Evento para mostrar/ocultar permissões baseado no tipo
+        document.getElementById('tipo').addEventListener('change', togglePermissoes);
     });
 
     function novoUsuario() {
@@ -271,11 +343,43 @@ $usuarios = $stmt->fetchAll();
         document.getElementById('modalUsuarioTitulo').textContent = 'Novo Usuário';
         document.getElementById('senha').required = true;
         document.getElementById('ativo').checked = true;
+        document.getElementById('tipo').value = 'atendente';
+        togglePermissoes();
+        limparPermissoes();
+    }
+
+    function togglePermissoes() {
+        const tipo = document.getElementById('tipo').value;
+        const secaoPermissoes = document.getElementById('secao-permissoes');
+        secaoPermissoes.style.display = tipo === 'atendente' ? 'block' : 'none';
+    }
+
+    function limparPermissoes() {
+        document.querySelectorAll('input[name="permissoes[]"]').forEach(cb => cb.checked = false);
+    }
+
+    function carregarPermissoes(permissoesJson) {
+        limparPermissoes();
+        if (!permissoesJson) return;
+
+        let permissoes = [];
+        try {
+            permissoes = typeof permissoesJson === 'string' ? JSON.parse(permissoesJson) : permissoesJson;
+        } catch(e) {
+            permissoes = [];
+        }
+
+        if (Array.isArray(permissoes)) {
+            permissoes.forEach(perm => {
+                const cb = document.querySelector(`input[name="permissoes[]"][value="${perm}"]`);
+                if (cb) cb.checked = true;
+            });
+        }
     }
 
     function editarUsuario(id) {
         modoEdicao = true;
-        
+
         $.ajax({
             url: 'api_usuario.php?id=' + id,
             method: 'GET',
@@ -289,7 +393,11 @@ $usuarios = $stmt->fetchAll();
                     document.getElementById('ativo').checked = user.ativo == 1;
                     document.getElementById('senha').value = '';
                     document.getElementById('senha').required = false;
-                    
+
+                    // Carregar permissões
+                    togglePermissoes();
+                    carregarPermissoes(user.permissoes);
+
                     document.getElementById('modalUsuarioTitulo').textContent = 'Editar Usuário';
                     modalUsuario.show();
                 }

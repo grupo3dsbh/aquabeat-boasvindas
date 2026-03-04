@@ -13,6 +13,10 @@ try {
     $tipo = $_POST['tipo'] ?? 'atendente';
     $senha = $_POST['senha'] ?? null;
     $ativo = isset($_POST['ativo']) ? 1 : 0;
+    $permissoes = $_POST['permissoes'] ?? [];
+
+    // Para admins, permissões é sempre null (eles têm todas)
+    $permissoesJson = ($tipo === 'admin') ? null : json_encode(array_values($permissoes));
     
     if (!$nome || !$email) {
         throw new Exception('Nome e e-mail são obrigatórios');
@@ -20,25 +24,26 @@ try {
     
     if ($id) {
         // Atualizar
-        $sql = "UPDATE usuarios SET nome = :nome, email = :email, tipo = :tipo, ativo = :ativo";
+        $sql = "UPDATE usuarios SET nome = :nome, email = :email, tipo = :tipo, ativo = :ativo, permissoes = :permissoes";
         $params = [
             ':nome' => $nome,
             ':email' => $email,
             ':tipo' => $tipo,
             ':ativo' => $ativo,
+            ':permissoes' => $permissoesJson,
             ':id' => $id
         ];
-        
+
         if ($senha) {
             $sql .= ", senha = MD5(:senha)";
             $params[':senha'] = $senha;
         }
-        
+
         $sql .= " WHERE id = :id";
-        
+
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
-        
+
         $mensagem = 'Usuário atualizado com sucesso!';
         
     } else {
@@ -55,16 +60,17 @@ try {
         }
         
         $stmt = $db->prepare("
-            INSERT INTO usuarios (nome, email, senha, tipo, ativo)
-            VALUES (:nome, :email, MD5(:senha), :tipo, :ativo)
+            INSERT INTO usuarios (nome, email, senha, tipo, ativo, permissoes)
+            VALUES (:nome, :email, MD5(:senha), :tipo, :ativo, :permissoes)
         ");
-        
+
         $stmt->execute([
             ':nome' => $nome,
             ':email' => $email,
             ':senha' => $senha,
             ':tipo' => $tipo,
-            ':ativo' => $ativo
+            ':ativo' => $ativo,
+            ':permissoes' => $permissoesJson
         ]);
         
         $mensagem = 'Usuário criado com sucesso!';

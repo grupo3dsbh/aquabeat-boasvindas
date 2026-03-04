@@ -127,6 +127,18 @@ class Auth {
     }
 
     /**
+     * Verificar se usuário tem uma permissão específica
+     */
+    public static function temPermissao($permissao) {
+        if (self::isAdmin()) return true; // Admin tem todas as permissões
+        $permissoes = $_SESSION['usuario_permissoes'] ?? [];
+        if (is_string($permissoes)) {
+            $permissoes = json_decode($permissoes, true) ?? [];
+        }
+        return in_array($permissao, $permissoes);
+    }
+
+    /**
      * Obter email do usuário logado
      */
     public static function getUserEmail() {
@@ -140,7 +152,7 @@ class Auth {
         $db = Database::getConnectionBV();
 
         $stmt = $db->prepare("
-            SELECT id, nome, email, tipo, ativo
+            SELECT id, nome, email, tipo, ativo, permissoes
             FROM usuarios
             WHERE email = :email AND senha = MD5(:senha) AND ativo = 1
         ");
@@ -157,6 +169,7 @@ class Auth {
             $_SESSION['usuario_nome'] = $usuario['nome'];
             $_SESSION['usuario_email'] = $usuario['email'];
             $_SESSION['usuario_tipo'] = $usuario['tipo'];
+            $_SESSION['usuario_permissoes'] = json_decode($usuario['permissoes'] ?? '[]', true) ?? [];
             return true;
         }
 

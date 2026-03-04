@@ -435,6 +435,77 @@ function isValidScript($script) {
         .log-item.checkbox_marcado { border-left-color: #28a745; }
         .log-item.texto_salvo { border-left-color: #17a2b8; }
 
+        /* Card de Parcelas/Pagamento */
+        .card-parcelas {
+            border-radius: 10px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .card-parcelas-header {
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-parcelas-header h6 {
+            margin: 0;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .card-parcelas-body {
+            padding: 12px;
+        }
+        .parcela-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .parcela-status i { font-size: 20px; }
+        .parcela-info {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 12px;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+        /* Verde - Parcela Paga */
+        .card-parcelas.parcela-paga {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 2px solid #28a745;
+        }
+        .card-parcelas.parcela-paga .card-parcelas-header {
+            background: #28a745;
+            color: white;
+        }
+        .card-parcelas.parcela-paga .parcela-status { color: #155724; }
+        .card-parcelas.parcela-paga .parcela-info { color: #155724; }
+        /* Vermelho - Parcela Pendente */
+        .card-parcelas.parcela-pendente {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border: 2px solid #dc3545;
+        }
+        .card-parcelas.parcela-pendente .card-parcelas-header {
+            background: #dc3545;
+            color: white;
+        }
+        .card-parcelas.parcela-pendente .parcela-status { color: #721c24; }
+        .card-parcelas.parcela-pendente .parcela-info { color: #721c24; }
+        /* Cinza - Sem informação */
+        .card-parcelas.parcela-sem-info {
+            background: #f8f9fa;
+            border: 2px solid #6c757d;
+        }
+        .card-parcelas.parcela-sem-info .card-parcelas-header {
+            background: #6c757d;
+            color: white;
+        }
+        .card-parcelas.parcela-sem-info .parcela-status { color: #495057; }
+
         .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .spin { animation: spin 1s linear infinite; }
@@ -748,53 +819,76 @@ function isValidScript($script) {
                         $entrada_paga  = null;
                         $qtd_pagas = 0;
                         $qtd_total = 0;
+                        $valor_parcela = 0;
                         if ($tem_dados_pag) {
                             $qtd_pagas = intval($dados_pagamento_api['qtd_parcelas_pagas'] ?? 0);
                             $qtd_total = intval($dados_pagamento_api['quantidade_parcelas_venda'] ?? 0);
+                            $valor_parcela = floatval($dados_pagamento_api['valor_parcela'] ?? 0);
                             // Se tem pelo menos 1 parcela paga, a primeira foi paga
                             $entrada_paga = $qtd_pagas >= 1;
                         }
+                        // Verificar permissão para editar pagamento
+                        $pode_editar_pagamento = Auth::isAdmin() || Auth::temPermissao('editar_pagamento');
                         ?>
+                    </div>
+                </div>
+
+                <!-- Card de Parcelas/Pagamento -->
+                <div class="card-parcelas <?= $tem_dados_pag ? ($entrada_paga ? 'parcela-paga' : 'parcela-pendente') : 'parcela-sem-info' ?>">
+                    <div class="card-parcelas-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-credit-card-2-front"></i> Situação Financeira
+                        </h6>
+                        <?php if ($pode_editar_pagamento): ?>
+                        <button class="btn btn-sm btn-outline-light py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalPagamento" title="Registrar pagamento">
+                            <i class="bi bi-pencil-square"></i>
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="card-parcelas-body">
                         <?php if ($tem_dados_pag): ?>
-                        <div class="info-item">
-                            <div class="info-label">1ª Parcela</div>
-                            <div class="info-value">
-                                <?php if ($entrada_paga): ?>
-                                    <span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Paga</span>
-                                <?php else: ?>
-                                    <span class="badge bg-danger"><i class="bi bi-x-circle-fill"></i> Não paga</span>
-                                <?php endif; ?>
-                                <?php if (!empty($dados_pagamento_api['valor_parcela'])): ?>
-                                    <span class="ms-1 fw-bold <?= $entrada_paga ? 'text-success' : 'text-danger' ?>">
-                                        <?= formatarMoeda($dados_pagamento_api['valor_parcela']) ?>
-                                    </span>
-                                <?php endif; ?>
-                            </div>
+                        <div class="parcela-status">
+                            <?php if ($entrada_paga): ?>
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>1ª Parcela Paga</span>
+                            <?php else: ?>
+                                <i class="bi bi-x-circle-fill"></i>
+                                <span>1ª Parcela Pendente</span>
+                            <?php endif; ?>
+                            <?php if ($valor_parcela > 0): ?>
+                                <strong><?= formatarMoeda($valor_parcela) ?></strong>
+                            <?php endif; ?>
                         </div>
                         <?php if ($qtd_total > 0): ?>
-                        <div class="info-item">
-                            <div class="info-label">Parcelas</div>
-                            <div class="info-value">
-                                <span class="fw-bold"><?= $qtd_pagas ?></span> de <?= $qtd_total ?>x pagas
-                                <?php if (!empty($dados_pagamento_api['valor_parcela'])): ?>
-                                <span class="text-muted">(<?= formatarMoeda($dados_pagamento_api['valor_parcela']) ?>/mês)</span>
-                                <?php endif; ?>
-                            </div>
+                        <div class="parcela-info">
+                            <span><i class="bi bi-calendar3"></i> Parcelas:</span>
+                            <strong><?= $qtd_pagas ?> de <?= $qtd_total ?></strong> pagas
                         </div>
                         <?php endif; ?>
                         <?php if (!empty($dados_pagamento_api['total_pago']) && $dados_pagamento_api['total_pago'] > 0): ?>
-                        <div class="info-item">
-                            <div class="info-label">Total Pago</div>
-                            <div class="info-value text-success fw-bold"><?= formatarMoeda($dados_pagamento_api['total_pago']) ?></div>
+                        <div class="parcela-info">
+                            <span><i class="bi bi-cash-stack"></i> Total Pago:</span>
+                            <strong><?= formatarMoeda($dados_pagamento_api['total_pago']) ?></strong>
                         </div>
                         <?php endif; ?>
                         <?php if (!empty($dados_pagamento_api['saldo_restante']) && $dados_pagamento_api['saldo_restante'] > 0): ?>
-                        <div class="info-item">
-                            <div class="info-label">Saldo Restante</div>
-                            <div class="info-value text-warning"><?= formatarMoeda($dados_pagamento_api['saldo_restante']) ?></div>
+                        <div class="parcela-info">
+                            <span><i class="bi bi-hourglass-split"></i> Saldo:</span>
+                            <strong><?= formatarMoeda($dados_pagamento_api['saldo_restante']) ?></strong>
                         </div>
                         <?php endif; ?>
+                        <?php else: ?>
+                        <div class="parcela-status">
+                            <i class="bi bi-question-circle"></i>
+                            <span>Sem informação de pagamento</span>
+                        </div>
+                        <p class="text-muted small mb-0 mt-2">Dados financeiros não disponíveis na base de vendas.</p>
                         <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Continua Dados do Cliente após card de parcelas - dummy div para manter estrutura -->
+                <div style="display:none;">
 
                         <div class="info-item">
                             <div class="info-label">Consultor</div>
@@ -1312,6 +1406,64 @@ function isValidScript($script) {
         </div>
     </div>
 
+    <!-- Modal Registrar Pagamento -->
+    <div class="modal fade" id="modalPagamento" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-credit-card-2-front"></i> Registrar Pagamento de Parcela</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formPagamento">
+                        <input type="hidden" name="boas_vindas_id" value="<?= $titulo['id'] ?>">
+                        <input type="hidden" name="numero_titulo" value="<?= htmlspecialchars($titulo['numero_titulo']) ?>">
+                        <div class="mb-3">
+                            <label class="form-label">Valor da Parcela</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" step="0.01" class="form-control" name="valor_parcela" id="pag_valor" value="<?= $valor_parcela > 0 ? number_format($valor_parcela, 2, '.', '') : '' ?>" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Data do Pagamento</label>
+                                    <input type="date" class="form-control" name="data_pagamento" value="<?= date('Y-m-d') ?>" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Forma de Pagamento</label>
+                                    <select class="form-select" name="forma_pagamento" required>
+                                        <option value="">Selecione...</option>
+                                        <option value="pix">PIX</option>
+                                        <option value="cartao_credito">Cartão de Crédito</option>
+                                        <option value="cartao_debito">Cartão de Débito</option>
+                                        <option value="boleto">Boleto</option>
+                                        <option value="dinheiro">Dinheiro</option>
+                                        <option value="transferencia">Transferência</option>
+                                        <option value="outro">Outro</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Observação <small class="text-muted">(opcional)</small></label>
+                            <textarea class="form-control" name="observacao" rows="2" placeholder="Ex: Pagamento confirmado via comprovante"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="salvarPagamento()">
+                        <i class="bi bi-check-circle"></i> Confirmar Pagamento
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div class="toast-container">
         <div class="toast" id="toast" role="alert">
@@ -1355,6 +1507,45 @@ function isValidScript($script) {
         navigator.clipboard.writeText(pre.textContent).then(() => {
             btn.innerHTML = '<i class="bi bi-check"></i>';
             setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 2000);
+        });
+    }
+
+    function salvarPagamento() {
+        const form = document.getElementById('formPagamento');
+        const formData = new FormData(form);
+
+        // Validar campos obrigatórios
+        if (!formData.get('valor_parcela') || !formData.get('data_pagamento') || !formData.get('forma_pagamento')) {
+            showToast('Preencha todos os campos obrigatórios', 'danger');
+            return;
+        }
+
+        const btn = document.querySelector('#modalPagamento .btn-success');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split spin"></i> Salvando...';
+
+        $.ajax({
+            url: baseUrl + '/api_pagamento.php',
+            method: 'POST',
+            data: Object.fromEntries(formData),
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    showToast('Pagamento registrado com sucesso!', 'success');
+                    // Fechar modal e recarregar página
+                    bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showToast(response.error || 'Erro ao salvar pagamento', 'danger');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check-circle"></i> Confirmar Pagamento';
+                }
+            },
+            error: function() {
+                showToast('Erro de conexão', 'danger');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-circle"></i> Confirmar Pagamento';
+            }
         });
     }
 
