@@ -67,36 +67,22 @@ if (!$titulo) {
 $dados_pagamento_api = [];
 try {
     $db_api = Database::getConnectionAPI();
-    // Descobrir colunas disponíveis dinamicamente
-    $cols = $db_api->query("DESCRIBE titulos")->fetchAll(PDO::FETCH_COLUMN);
-
-    // Mapear campos de pagamento por possíveis nomes
-    $mapa_pagamento = [
-        'valor_entrada'        => ['valor_entrada', 'vl_entrada', 'entrada'],
-        'valor_parcela'        => ['valor_parcela', 'vl_parcela', 'parcela', 'valor_mensalidade', 'mensalidade'],
-        'num_parcelas'         => ['num_parcelas', 'numero_parcelas', 'quantidade_parcelas', 'qtd_parcelas', 'parcelas'],
-        'entrada_paga'         => ['entrada_paga', 'primeira_parcela_paga', 'status_entrada', 'pago_entrada'],
-        'data_entrada'         => ['data_entrada', 'data_primeira_parcela', 'data_pagamento_entrada'],
-        'forma_pagamento_entrada' => ['forma_pagamento_entrada', 'pagamento_entrada', 'tipo_entrada'],
-        'status_pagamento'     => ['status_pagamento', 'situacao_pagamento'],
-    ];
-
-    $campos_pag = [];
-    foreach ($mapa_pagamento as $alias => $possiveis) {
-        foreach ($possiveis as $campo) {
-            if (in_array($campo, $cols)) {
-                $campos_pag[$alias] = $campo;
-                break;
-            }
-        }
-    }
-
-    if (!empty($campos_pag)) {
-        $select_pag = implode(', ', array_map(fn($a, $c) => "$c as $a", array_keys($campos_pag), $campos_pag));
-        $stmt_pag = $db_api->prepare("SELECT $select_pag FROM titulos WHERE numero_titulo = :n LIMIT 1");
-        $stmt_pag->execute([':n' => $numero_titulo]);
-        $dados_pagamento_api = $stmt_pag->fetch() ?: [];
-    }
+    $stmt_pag = $db_api->prepare("
+        SELECT
+            quantidade_parcelas_venda,
+            qtd_parcelas_pagas,
+            parcelas_restantes,
+            valor_parcela,
+            total_pago,
+            saldo_restante,
+            forma_pagamento,
+            tipo_pagamento
+        FROM titulos
+        WHERE numero_titulo = :n
+        LIMIT 1
+    ");
+    $stmt_pag->execute([':n' => $numero_titulo]);
+    $dados_pagamento_api = $stmt_pag->fetch() ?: [];
 } catch (Exception $e) {}
 
 // Buscar interações já salvas
@@ -760,52 +746,52 @@ function isValidScript($script) {
                         // --- Bloco Parcelas / Entrada ---
                         $tem_dados_pag = !empty($dados_pagamento_api);
                         $entrada_paga  = null;
+                        $qtd_pagas = 0;
+                        $qtd_total = 0;
                         if ($tem_dados_pag) {
-                            // Determinar se entrada foi paga
-                            $ep = $dados_pagamento_api['entrada_paga'] ?? null;
-                            if ($ep !== null) {
-                                $entrada_paga = in_array(strtolower((string)$ep), ['1','sim','s','pago','paga','yes','true','paid']);
-                            } elseif (!empty($dados_pagamento_api['status_pagamento'])) {
-                                $sp = strtolower($dados_pagamento_api['status_pagamento']);
-                                $entrada_paga = in_array($sp, ['pago','paga','confirmado','paid','quitado']);
-                            }
+                            $qtd_pagas = intval($dados_pagamento_api['qtd_parcelas_pagas'] ?? 0);
+                            $qtd_total = intval($dados_pagamento_api['quantidade_parcelas_venda'] ?? 0);
+                            // Se tem pelo menos 1 parcela paga, a primeira foi paga
+                            $entrada_paga = $qtd_pagas >= 1;
                         }
                         ?>
                         <?php if ($tem_dados_pag): ?>
                         <div class="info-item">
                             <div class="info-label">1ª Parcela</div>
                             <div class="info-value">
-                                <?php if ($entrada_paga === true): ?>
+                                <?php if ($entrada_paga): ?>
                                     <span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Paga</span>
-                                <?php elseif ($entrada_paga === false): ?>
-                                    <span class="badge bg-danger"><i class="bi bi-x-circle-fill"></i> Não paga</span>
                                 <?php else: ?>
-                                    <span class="badge bg-secondary">Não informado</span>
+                                    <span class="badge bg-danger"><i class="bi bi-x-circle-fill"></i> Não paga</span>
                                 <?php endif; ?>
-                                <?php if (!empty($dados_pagamento_api['valor_entrada'])): ?>
-                                    <span class="ms-1 fw-bold <?= $entrada_paga === false ? 'text-danger' : ($entrada_paga === true ? 'text-success' : '') ?>">
-                                        <?= formatarMoeda($dados_pagamento_api['valor_entrada']) ?>
+                                <?php if (!empty($dados_pagamento_api['valor_parcela'])): ?>
+                                    <span class="ms-1 fw-bold <?= $entrada_paga ? 'text-success' : 'text-danger' ?>">
+                                        <?= formatarMoeda($dados_pagamento_api['valor_parcela']) ?>
                                     </span>
-                                <?php elseif (!empty($dados_pagamento_api['valor_parcela'])): ?>
-                                    <span class="ms-1"><?= formatarMoeda($dados_pagamento_api['valor_parcela']) ?></span>
                                 <?php endif; ?>
                             </div>
                         </div>
-                        <?php if (!empty($dados_pagamento_api['num_parcelas'])): ?>
+                        <?php if ($qtd_total > 0): ?>
                         <div class="info-item">
                             <div class="info-label">Parcelas</div>
                             <div class="info-value">
-                                <?= intval($dados_pagamento_api['num_parcelas']) ?>x
+                                <span class="fw-bold"><?= $qtd_pagas ?></span> de <?= $qtd_total ?>x pagas
                                 <?php if (!empty($dados_pagamento_api['valor_parcela'])): ?>
-                                de <?= formatarMoeda($dados_pagamento_api['valor_parcela']) ?>
+                                <span class="text-muted">(<?= formatarMoeda($dados_pagamento_api['valor_parcela']) ?>/mês)</span>
                                 <?php endif; ?>
                             </div>
                         </div>
                         <?php endif; ?>
-                        <?php if (!empty($dados_pagamento_api['data_entrada'])): ?>
+                        <?php if (!empty($dados_pagamento_api['total_pago']) && $dados_pagamento_api['total_pago'] > 0): ?>
                         <div class="info-item">
-                            <div class="info-label">Data Entrada</div>
-                            <div class="info-value"><?= formatarData($dados_pagamento_api['data_entrada'], 'd/m/Y') ?></div>
+                            <div class="info-label">Total Pago</div>
+                            <div class="info-value text-success fw-bold"><?= formatarMoeda($dados_pagamento_api['total_pago']) ?></div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($dados_pagamento_api['saldo_restante']) && $dados_pagamento_api['saldo_restante'] > 0): ?>
+                        <div class="info-item">
+                            <div class="info-label">Saldo Restante</div>
+                            <div class="info-value text-warning"><?= formatarMoeda($dados_pagamento_api['saldo_restante']) ?></div>
                         </div>
                         <?php endif; ?>
                         <?php endif; ?>
