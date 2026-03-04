@@ -93,41 +93,44 @@ if (!empty($documento_cliente)) {
         $db_api = Database::getConnectionAPI();
         $doc_limpo = preg_replace('/[^0-9]/', '', $documento_cliente);
 
-        // Tentar primeiro na tabela titulos
+        // Verificar quais colunas existem na tabela titulos
+        $colunas_titulos = [];
         try {
-            $stmt_dup = $db_api->prepare("
-                SELECT
-                    numero_titulo,
-                    nome_titular,
-                    documento_titular,
-                    data_primeira_venda,
-                    situacao
-                FROM titulos
-                WHERE REPLACE(REPLACE(REPLACE(documento_titular, '.', ''), '-', ''), '/', '') = :doc
-                ORDER BY data_primeira_venda ASC
-            ");
-            $stmt_dup->execute([':doc' => $doc_limpo]);
-            $cotas_duplicadas = $stmt_dup->fetchAll();
-        } catch (Exception $e1) {
-            // Se falhar, tentar na tabela titulos_analise
-            try {
-                $stmt_dup2 = $db_api->prepare("
-                    SELECT
-                        numero_titulo,
-                        nome_titular,
-                        documento_titular,
-                        data_primeira_venda,
-                        situacao
-                    FROM titulos_analise
-                    WHERE REPLACE(REPLACE(REPLACE(documento_titular, '.', ''), '-', ''), '/', '') = :doc
-                    ORDER BY data_primeira_venda ASC
-                ");
-                $stmt_dup2->execute([':doc' => $doc_limpo]);
-                $cotas_duplicadas = $stmt_dup2->fetchAll();
-            } catch (Exception $e2) {
-                $cotas_duplicadas = [];
+            $stmt_cols = $db_api->query("DESCRIBE titulos");
+            $colunas_titulos = $stmt_cols->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {}
+
+        // Construir SELECT dinamicamente baseado nas colunas disponíveis
+        $select_cols = ['numero_titulo', 'nome_titular', 'documento_titular'];
+        if (in_array('data_primeira_venda', $colunas_titulos)) {
+            $select_cols[] = 'data_primeira_venda';
+        }
+        // Tentar diferentes nomes para situação
+        $col_situacao = null;
+        foreach (['situacao', 'situacao_atual', 'status', 'status_titulo'] as $possivel) {
+            if (in_array($possivel, $colunas_titulos)) {
+                $col_situacao = $possivel;
+                $select_cols[] = "$possivel as situacao";
+                break;
             }
         }
+        // Se não encontrou coluna de situação, adicionar valor fixo
+        if (!$col_situacao) {
+            $select_cols[] = "'N/A' as situacao";
+        }
+
+        $select_sql = implode(', ', $select_cols);
+        $order_col = in_array('data_primeira_venda', $colunas_titulos) ? 'data_primeira_venda' : 'numero_titulo';
+
+        $stmt_dup = $db_api->prepare("
+            SELECT $select_sql
+            FROM titulos
+            WHERE REPLACE(REPLACE(REPLACE(documento_titular, '.', ''), '-', ''), '/', '') = :doc
+            ORDER BY $order_col ASC
+        ");
+        $stmt_dup->execute([':doc' => $doc_limpo]);
+        $cotas_duplicadas = $stmt_dup->fetchAll();
+
     } catch (Exception $e) {
         $cotas_duplicadas = [];
     }
@@ -1549,12 +1552,26 @@ function isValidScript($script) {
                         Encontradas <strong><?= count($cotas_duplicadas) ?></strong> cotas com o CPF <?= formatarDocumento($titulo['documento_cliente']) ?>
                     </p>
                     <?php
+                    // Buscar status do boas_vindas para cada título duplicado
+                    $status_bv = [];
+                    try {
+                        $numeros = array_column($cotas_duplicadas, 'numero_titulo');
+                        if (!empty($numeros)) {
+                            $placeholders = implode(',', array_fill(0, count($numeros), '?'));
+                            $stmt_bv_status = $db->prepare("SELECT numero_titulo, status FROM boas_vindas WHERE numero_titulo IN ($placeholders)");
+                            $stmt_bv_status->execute($numeros);
+                            foreach ($stmt_bv_status->fetchAll() as $row) {
+                                $status_bv[$row['numero_titulo']] = $row['status'];
+                            }
+                        }
+                    } catch (Exception $e) {}
+
                     // Encontrar o título principal (mais antigo e ativo)
                     $titulo_principal = null;
                     foreach ($cotas_duplicadas as $cota) {
                         $sit = strtolower($cota['situacao'] ?? '');
-                        if ($sit === 'ativo' || $sit === 'adimplente' || $sit === 'vigente') {
-                            if (!$titulo_principal || strtotime($cota['data_primeira_venda']) < strtotime($titulo_principal['data_primeira_venda'])) {
+                        if ($sit === 'ativo' || $sit === 'adimplente' || $sit === 'vigente' || $sit === 'n/a') {
+                            if (!$titulo_principal || strtotime($cota['data_primeira_venda'] ?? '1970-01-01') < strtotime($titulo_principal['data_primeira_venda'] ?? '1970-01-01')) {
                                 $titulo_principal = $cota;
                             }
                         }
@@ -1562,15 +1579,26 @@ function isValidScript($script) {
                     ?>
                     <div class="row g-3">
                         <?php foreach ($cotas_duplicadas as $cota):
-                            $sit = strtolower($cota['situacao'] ?? 'indefinido');
-                            $is_ativo = in_array($sit, ['ativo', 'adimplente', 'vigente']);
+                            $sit = strtolower($cota['situacao'] ?? 'n/a');
+                            $sit_bv = $status_bv[$cota['numero_titulo']] ?? null;
+
+                            // Determinar status combinado
+                            $status_exibir = ucfirst($sit);
+                            if ($sit === 'n/a' && $sit_bv) {
+                                $status_exibir = ucfirst($sit_bv);
+                                $sit = $sit_bv;
+                            }
+
+                            $is_ativo = in_array($sit, ['ativo', 'adimplente', 'vigente', 'pendente', 'em_andamento']);
                             $is_cancelado = in_array($sit, ['cancelado', 'inativo', 'desistente']);
+                            $is_concluido = $sit === 'concluido';
                             $is_bloqueado = in_array($sit, ['bloqueado', 'suspenso', 'inadimplente']);
 
                             $classe_status = 'cota-ativo';
                             if ($is_cancelado) $classe_status = 'cota-cancelado';
+                            elseif ($is_concluido) $classe_status = 'cota-ativo';
                             elseif ($is_bloqueado) $classe_status = 'cota-bloqueado';
-                            elseif (!$is_ativo) $classe_status = 'cota-bloqueado'; // default para status desconhecido
+                            elseif (!$is_ativo && $sit !== 'n/a') $classe_status = 'cota-bloqueado';
 
                             $is_principal = $titulo_principal && $cota['numero_titulo'] === $titulo_principal['numero_titulo'];
                             $is_atual = $cota['numero_titulo'] === $titulo['numero_titulo'];
@@ -1583,10 +1611,10 @@ function isValidScript($script) {
                                         <i class="bi bi-ticket-perforated"></i>
                                         <?= htmlspecialchars($cota['numero_titulo']) ?>
                                     </div>
-                                    <span class="cota-status-badge"><?= htmlspecialchars(ucfirst($cota['situacao'] ?? 'N/A')) ?></span>
+                                    <span class="cota-status-badge"><?= htmlspecialchars($status_exibir) ?></span>
                                 </div>
                                 <div class="cota-info">
-                                    <div><i class="bi bi-calendar3"></i> <strong>Data Compra:</strong> <?= formatarData($cota['data_primeira_venda'], 'd/m/Y') ?></div>
+                                    <div><i class="bi bi-calendar3"></i> <strong>Data Compra:</strong> <?= formatarData($cota['data_primeira_venda'] ?? null, 'd/m/Y') ?></div>
                                     <div><i class="bi bi-person"></i> <strong>Titular:</strong> <?= htmlspecialchars($cota['nome_titular'] ?? '-') ?></div>
                                 </div>
                             </div>
