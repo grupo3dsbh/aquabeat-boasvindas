@@ -672,17 +672,15 @@ $url_params = http_build_query(array_filter([
                     </div>
 
                     <div id="paginacao_vendas" class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top" style="display: none;">
-                        <small class="text-muted">
-                            Página <span id="pagina_atual">1</span> de <span id="total_paginas">1</span>
+                        <button class="btn btn-outline-primary btn-sm" id="btnVendasAnterior" onclick="paginaVendasAnterior()" disabled>
+                            <i class="bi bi-chevron-left"></i> Anterior
+                        </button>
+                        <small class="text-muted text-center">
+                            Página <strong><span id="pagina_atual">1</span></strong> de <span id="total_paginas">1</span>
                         </small>
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" id="btnVendasAnterior" onclick="paginaVendasAnterior()" disabled>
-                                <i class="bi bi-chevron-left"></i> Anterior
-                            </button>
-                            <button class="btn btn-outline-primary" id="btnVendasProxima" onclick="paginaVendasProxima()">
-                                Próxima <i class="bi bi-chevron-right"></i>
-                            </button>
-                        </div>
+                        <button class="btn btn-outline-primary btn-sm" id="btnVendasProxima" onclick="paginaVendasProxima()">
+                            Próxima <i class="bi bi-chevron-right"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -838,10 +836,12 @@ $url_params = http_build_query(array_filter([
     const dataInicio = '<?= $data_inicio ?>';
     const dataFim = '<?= $data_fim ?>';
     let filtroStatusVendas = '<?= $filtro_status_vendas ?>';
-    let paginaAtual = 1;
+    // Ler página inicial da URL (query string: page=N)
+    const urlParams = new URLSearchParams(window.location.search);
+    let paginaAtual = Math.max(1, parseInt(urlParams.get('page') || '1'));
     let totalPaginas = 1;
-    let vendasCarregadas = [];
     let buscaVendasTexto = '';
+    // vendasCarregadas removido – paginação substitui "carregar mais"
 
     $(document).ready(function() {
         carregarVendas();
@@ -912,7 +912,9 @@ $url_params = http_build_query(array_filter([
     function filtrarVendas(status) {
         filtroStatusVendas = status;
         paginaAtual = 1;
-        vendasCarregadas = [];
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', 1);
+        window.history.replaceState({page: 1}, '', url.toString());
         // Update active class
         $('.filter-tabs a[onclick*="filtrarVendas"]').removeClass('active');
         $(`.filter-tabs a[onclick*="filtrarVendas('${status}')"]`).addClass('active');
@@ -922,7 +924,9 @@ $url_params = http_build_query(array_filter([
     function buscarVendas() {
         buscaVendasTexto = $('#buscaVendas').val().trim();
         paginaAtual = 1;
-        vendasCarregadas = [];
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', 1);
+        window.history.replaceState({page: 1}, '', url.toString());
         if (buscaVendasTexto) {
             $('#btnLimparBuscaVendas').show();
         }
@@ -934,7 +938,6 @@ $url_params = http_build_query(array_filter([
         $('#buscaVendas').val('');
         $('#btnLimparBuscaVendas').hide();
         paginaAtual = 1;
-        vendasCarregadas = [];
         carregarVendas();
     }
 
@@ -980,7 +983,6 @@ $url_params = http_build_query(array_filter([
                     $('#pagina_atual').text(paginaAtual);
                     $('#total_paginas').text(totalPaginas);
 
-                    vendasCarregadas = response.data;
                     renderizarVendas(response.data);
 
                     // Atualizar botões de paginação
@@ -1008,17 +1010,33 @@ $url_params = http_build_query(array_filter([
 
     function paginaVendasAnterior() {
         if (paginaAtual > 1) {
-            paginaAtual--;
-            carregarVendas();
+            irParaPaginaVendas(paginaAtual - 1);
         }
     }
 
     function paginaVendasProxima() {
         if (paginaAtual < totalPaginas) {
-            paginaAtual++;
-            carregarVendas();
+            irParaPaginaVendas(paginaAtual + 1);
         }
     }
+
+    function irParaPaginaVendas(pagina) {
+        paginaAtual = pagina;
+        // Atualizar URL sem recarregar a página
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', pagina);
+        window.history.pushState({page: pagina}, '', url.toString());
+        // Scroll suave até o topo do card de vendas
+        document.getElementById('listaVendas')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+        carregarVendas();
+    }
+
+    // Navegar com botão Voltar/Avançar do browser
+    window.addEventListener('popstate', function(e) {
+        const p = e.state?.page || parseInt(new URLSearchParams(window.location.search).get('page') || '1');
+        paginaAtual = p;
+        carregarVendas();
+    });
 
     function renderizarVendas(vendas) {
         const lista = $('#listaVendas');
