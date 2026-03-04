@@ -1,11 +1,14 @@
 -- Atualização v6: Sistema de permissões e registro de pagamentos
 -- Execute: mysql -u mcaq_uaboasvindas -p mcaq_uaboasvindas < update_database_v6.sql
+-- Ou execute cada comando separadamente no phpMyAdmin
 
 -- ==========================================
 -- ADICIONAR COLUNA DE PERMISSÕES NA TABELA USUARIOS
 -- ==========================================
+-- Nota: Se a coluna já existir, este comando vai dar erro, o que é esperado
+-- Nesse caso, ignore o erro e continue
 ALTER TABLE usuarios
-ADD COLUMN IF NOT EXISTS permissoes JSON DEFAULT NULL COMMENT 'Lista de permissões específicas do usuário';
+ADD COLUMN permissoes JSON DEFAULT NULL COMMENT 'Lista de permissões específicas do usuário';
 
 -- ==========================================
 -- CRIAR TABELA DE PAGAMENTOS REGISTRADOS
@@ -45,15 +48,6 @@ CREATE TABLE IF NOT EXISTS titulo_pagamentos (
 -- Dar permissão de editar_pagamento para todos os admins (já têm por padrão)
 -- Para atendentes específicos, usar a interface de usuários
 
--- Verificar se a coluna foi criada
-SELECT 'Coluna permissoes' as item, COUNT(*) as existe
-FROM information_schema.COLUMNS
-WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'usuarios'
-AND COLUMN_NAME = 'permissoes';
-
--- Verificar se a tabela foi criada
-SELECT 'Tabela titulo_pagamentos' as item, COUNT(*) as existe
-FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = DATABASE()
-AND TABLE_NAME = 'titulo_pagamentos';
+-- Verificar se funcionou:
+DESCRIBE usuarios;
+SHOW TABLES LIKE 'titulo_pagamentos';

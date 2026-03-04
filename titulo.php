@@ -85,6 +85,46 @@ try {
     $dados_pagamento_api = $stmt_pag->fetch() ?: [];
 } catch (Exception $e) {}
 
+// Buscar cotas duplicadas pelo mesmo CPF
+$cotas_duplicadas = [];
+$documento_cliente = $titulo['documento_cliente'] ?? '';
+if (!empty($documento_cliente)) {
+    try {
+        $db_api = Database::getConnectionAPI();
+        $doc_limpo = preg_replace('/[^0-9]/', '', $documento_cliente);
+        $stmt_dup = $db_api->prepare("
+            SELECT
+                numero_titulo,
+                nome_titular,
+                documento_titular,
+                data_primeira_venda,
+                situacao
+            FROM titulos
+            WHERE REPLACE(REPLACE(REPLACE(documento_titular, '.', ''), '-', ''), '/', '') = :doc
+            ORDER BY data_primeira_venda ASC
+        ");
+        $stmt_dup->execute([':doc' => $doc_limpo]);
+        $cotas_duplicadas = $stmt_dup->fetchAll();
+    } catch (Exception $e) {
+        // Se falhar, tentar na tabela titulos_analise
+        try {
+            $stmt_dup2 = $db_api->prepare("
+                SELECT
+                    numero_titulo,
+                    nome_titular,
+                    documento_titular,
+                    data_primeira_venda,
+                    situacao
+                FROM titulos_analise
+                WHERE REPLACE(REPLACE(REPLACE(documento_titular, '.', ''), '-', ''), '/', '') = :doc
+                ORDER BY data_primeira_venda ASC
+            ");
+            $stmt_dup2->execute([':doc' => $doc_limpo]);
+            $cotas_duplicadas = $stmt_dup2->fetchAll();
+        } catch (Exception $e2) {}
+    }
+}
+
 // Buscar interações já salvas
 $interacoes = [];
 try {
@@ -506,6 +546,77 @@ function isValidScript($script) {
         }
         .card-parcelas.parcela-sem-info .parcela-status { color: #495057; }
 
+        /* Estilos para cotas duplicadas */
+        .cota-card {
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .cota-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .cota-card.cota-ativo {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 2px solid #28a745;
+        }
+        .cota-card.cota-cancelado {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border: 2px solid #dc3545;
+            color: #6c757d;
+        }
+        .cota-card.cota-bloqueado {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+            border: 2px solid #fd7e14;
+        }
+        .cota-card.cota-principal {
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.5);
+            position: relative;
+        }
+        .cota-card.cota-principal::before {
+            content: '★ PRINCIPAL';
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            background: #28a745;
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        .cota-card.cota-atual {
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5);
+            position: relative;
+        }
+        .cota-card.cota-atual::after {
+            content: 'ATUAL';
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background: #007bff;
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        .cota-card .cota-id { font-weight: bold; font-size: 14px; }
+        .cota-card .cota-info { font-size: 12px; margin-top: 5px; }
+        .cota-card .cota-status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .cota-ativo .cota-status-badge { background: #28a745; color: white; }
+        .cota-cancelado .cota-status-badge { background: #dc3545; color: white; }
+        .cota-bloqueado .cota-status-badge { background: #fd7e14; color: white; }
+
         .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .spin { animation: spin 1s linear infinite; }
@@ -745,7 +856,14 @@ function isValidScript($script) {
                         </div>
                         <div class="info-item">
                             <div class="info-label">CPF/CNPJ</div>
-                            <div class="info-value"><?= formatarDocumento($titulo['documento_cliente']) ?></div>
+                            <div class="info-value">
+                                <?= formatarDocumento($titulo['documento_cliente']) ?>
+                                <?php if (count($cotas_duplicadas) > 1): ?>
+                                <button class="btn btn-sm btn-warning py-0 px-2 ms-2" data-bs-toggle="modal" data-bs-target="#modalDuplicados" title="<?= count($cotas_duplicadas) ?> cotas com este CPF">
+                                    <i class="bi bi-exclamation-triangle"></i> <?= count($cotas_duplicadas) ?>
+                                </button>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">Telefone</div>
@@ -1405,6 +1523,77 @@ function isValidScript($script) {
             </div>
         </div>
     </div>
+
+    <!-- Modal Cotas Duplicadas (mesmo CPF) -->
+    <?php if (count($cotas_duplicadas) > 1): ?>
+    <div class="modal fade" id="modalDuplicados" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Cotas duplicadas mesmo CPF - Título Atual: <?= htmlspecialchars($titulo['numero_titulo']) ?>/<?= ucfirst($titulo['status']) ?>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">
+                        <i class="bi bi-info-circle"></i>
+                        Encontradas <strong><?= count($cotas_duplicadas) ?></strong> cotas com o CPF <?= formatarDocumento($titulo['documento_cliente']) ?>
+                    </p>
+                    <?php
+                    // Encontrar o título principal (mais antigo e ativo)
+                    $titulo_principal = null;
+                    foreach ($cotas_duplicadas as $cota) {
+                        $sit = strtolower($cota['situacao'] ?? '');
+                        if ($sit === 'ativo' || $sit === 'adimplente' || $sit === 'vigente') {
+                            if (!$titulo_principal || strtotime($cota['data_primeira_venda']) < strtotime($titulo_principal['data_primeira_venda'])) {
+                                $titulo_principal = $cota;
+                            }
+                        }
+                    }
+                    ?>
+                    <div class="row g-3">
+                        <?php foreach ($cotas_duplicadas as $cota):
+                            $sit = strtolower($cota['situacao'] ?? 'indefinido');
+                            $is_ativo = in_array($sit, ['ativo', 'adimplente', 'vigente']);
+                            $is_cancelado = in_array($sit, ['cancelado', 'inativo', 'desistente']);
+                            $is_bloqueado = in_array($sit, ['bloqueado', 'suspenso', 'inadimplente']);
+
+                            $classe_status = 'cota-ativo';
+                            if ($is_cancelado) $classe_status = 'cota-cancelado';
+                            elseif ($is_bloqueado) $classe_status = 'cota-bloqueado';
+                            elseif (!$is_ativo) $classe_status = 'cota-bloqueado'; // default para status desconhecido
+
+                            $is_principal = $titulo_principal && $cota['numero_titulo'] === $titulo_principal['numero_titulo'];
+                            $is_atual = $cota['numero_titulo'] === $titulo['numero_titulo'];
+                        ?>
+                        <div class="col-md-6">
+                            <div class="cota-card <?= $classe_status ?> <?= $is_principal ? 'cota-principal' : '' ?> <?= $is_atual ? 'cota-atual' : '' ?>"
+                                 onclick="window.location.href='titulo.php?id=<?= urlencode($cota['numero_titulo']) ?>'">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="cota-id">
+                                        <i class="bi bi-ticket-perforated"></i>
+                                        <?= htmlspecialchars($cota['numero_titulo']) ?>
+                                    </div>
+                                    <span class="cota-status-badge"><?= htmlspecialchars(ucfirst($cota['situacao'] ?? 'N/A')) ?></span>
+                                </div>
+                                <div class="cota-info">
+                                    <div><i class="bi bi-calendar3"></i> <strong>Data Compra:</strong> <?= formatarData($cota['data_primeira_venda'], 'd/m/Y') ?></div>
+                                    <div><i class="bi bi-person"></i> <strong>Titular:</strong> <?= htmlspecialchars($cota['nome_titular'] ?? '-') ?></div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Modal Registrar Pagamento -->
     <div class="modal fade" id="modalPagamento" tabindex="-1">
