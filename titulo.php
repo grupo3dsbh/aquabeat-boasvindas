@@ -1028,7 +1028,6 @@ function isValidScript($script) {
                                 </button>
                             </div>
                         </div>
-                    </div>
                 </div>
 
                 <!-- Tentativas -->
