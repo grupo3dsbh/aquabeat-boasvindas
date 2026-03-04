@@ -92,36 +92,44 @@ if (!empty($documento_cliente)) {
     try {
         $db_api = Database::getConnectionAPI();
         $doc_limpo = preg_replace('/[^0-9]/', '', $documento_cliente);
-        $stmt_dup = $db_api->prepare("
-            SELECT
-                numero_titulo,
-                nome_titular,
-                documento_titular,
-                data_primeira_venda,
-                situacao
-            FROM titulos
-            WHERE REPLACE(REPLACE(REPLACE(documento_titular, '.', ''), '-', ''), '/', '') = :doc
-            ORDER BY data_primeira_venda ASC
-        ");
-        $stmt_dup->execute([':doc' => $doc_limpo]);
-        $cotas_duplicadas = $stmt_dup->fetchAll();
-    } catch (Exception $e) {
-        // Se falhar, tentar na tabela titulos_analise
+
+        // Tentar primeiro na tabela titulos
         try {
-            $stmt_dup2 = $db_api->prepare("
+            $stmt_dup = $db_api->prepare("
                 SELECT
                     numero_titulo,
                     nome_titular,
                     documento_titular,
                     data_primeira_venda,
                     situacao
-                FROM titulos_analise
+                FROM titulos
                 WHERE REPLACE(REPLACE(REPLACE(documento_titular, '.', ''), '-', ''), '/', '') = :doc
                 ORDER BY data_primeira_venda ASC
             ");
-            $stmt_dup2->execute([':doc' => $doc_limpo]);
-            $cotas_duplicadas = $stmt_dup2->fetchAll();
-        } catch (Exception $e2) {}
+            $stmt_dup->execute([':doc' => $doc_limpo]);
+            $cotas_duplicadas = $stmt_dup->fetchAll();
+        } catch (Exception $e1) {
+            // Se falhar, tentar na tabela titulos_analise
+            try {
+                $stmt_dup2 = $db_api->prepare("
+                    SELECT
+                        numero_titulo,
+                        nome_titular,
+                        documento_titular,
+                        data_primeira_venda,
+                        situacao
+                    FROM titulos_analise
+                    WHERE REPLACE(REPLACE(REPLACE(documento_titular, '.', ''), '-', ''), '/', '') = :doc
+                    ORDER BY data_primeira_venda ASC
+                ");
+                $stmt_dup2->execute([':doc' => $doc_limpo]);
+                $cotas_duplicadas = $stmt_dup2->fetchAll();
+            } catch (Exception $e2) {
+                $cotas_duplicadas = [];
+            }
+        }
+    } catch (Exception $e) {
+        $cotas_duplicadas = [];
     }
 }
 
